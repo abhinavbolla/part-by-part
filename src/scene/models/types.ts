@@ -8,6 +8,8 @@ export interface Fixtures {
   dimm(open: number): void;
   /** 0 latched .. 1 open: the graphics slot latch. */
   latch(open: number): void;
+  /** 0 shut .. 1 swung up: the heatsink over M.2 socket `slot`, if it has one. */
+  m2(slot: number, open: number): void;
 }
 
 export interface PartModel {
@@ -24,4 +26,6 @@ export interface PartModel {
   glow: MeshStandardMaterial[];
   /** Sub-objects to outline as drop targets; defaults to the whole group. */
   ghostTargets?: Object3D[];
+  /** How to turn the part for its own picture, when its best side faces away in the case. */
+  portrait?: [number, number, number];
 }

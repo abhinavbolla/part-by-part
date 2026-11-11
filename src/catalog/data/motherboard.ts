@@ -2,6 +2,11 @@ import type { MotherboardPart } from '../types.ts';
 
 // m2Slots lists each slot in the board's own numbering: the longest drive it
 // takes (80 = 2280, 110 = 22110) and whether it accepts SATA M.2 drives.
+//
+// `look` is where things sit, measured off the maker's top-down photo of the
+// board (and its manual's layout drawing) to within a few millimetres, then
+// laid on this project's slot grid. Heatsink heights are estimates: a photo
+// from above does not show them.
 export const MOTHERBOARDS: MotherboardPart[] = [
   {
     id: 'msi-b650-tomahawk-wifi', category: 'motherboard', brand: 'MSI', name: 'MAG B650 Tomahawk WiFi',
@@ -15,6 +20,22 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       { maxLength: 80, interfaces: ['nvme'] },
     ],
     sataPorts: 6, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [127, 92],
+      eps: [[49, 6], [67, 6]],
+      sinks: [
+        { kind: 'io', at: [-7, 0, 49, 163], tall: 40, tone: 'dark', top: 'groovesAcross', cuts: [['br', 18]] },
+        { kind: 'vrm', at: [49, 9, 73, 151], tall: 30, tone: 'dark', top: 'flat', cuts: [['br', 12]] },
+        { kind: 'vrm', at: [78, 0, 165, 29], tall: 28, tone: 'dark', top: 'slashes' },
+        { kind: 'm2', at: [29, 157, 161, 180], tall: 10, tone: 'dark', top: 'flat', cuts: [['bl', 8]], covers: [0] },
+        { kind: 'chipset', at: [157, 181, 232, 262], tall: 10, tone: 'dark', top: 'slashes', cuts: [['tl', 12], ['tr', 12]] },
+        { kind: 'm2', at: [122, 261, 232, 285], tall: 10, tone: 'dark', top: 'flat', cuts: [['bl', 8]], covers: [2] },
+      ],
+      slots: [{ row: 3, size: 'x16', steel: false }, { row: 5, size: 'x1', steel: false }],
+      m2: [[154, 166, -1], [120, 270, -1], [211, 270, -1]],
+      sataEdge: 4, sataAt: 223,
+      battery: [99, 215],
+    },
   },
   {
     id: 'asus-rog-strix-b650e-f-gaming-wifi', category: 'motherboard', brand: 'ASUS',
@@ -29,6 +50,22 @@ export const MOTHERBOARDS: MotherboardPart[] = [
     ],
     // One 8-pin CPU socket plus a 4-pin +12 V.
     sataPorts: 4, pcieX16Slots: 2, epsConnectors: 1, fanHeaders: 7,
+    look: {
+      socket: [128, 92],
+      eps: [[61, 7], [45, 7]],
+      sinks: [
+        { kind: 'io', at: [-8, 0, 46, 163], tall: 42, tone: 'dark', top: 'slashes', cuts: [['br', 18]] },
+        { kind: 'vrm', at: [46, 11, 78, 154], tall: 30, tone: 'dark', top: 'slashes' },
+        { kind: 'vrm', at: [74, 0, 167, 30], tall: 28, tone: 'dark', top: 'slashes' },
+        { kind: 'm2', at: [49, 157, 161, 181], tall: 10, tone: 'dark', top: 'flat', cuts: [['bl', 8], ['tr', 8]], covers: [0] },
+        { kind: 'm2', at: [12, 219, 159, 244], tall: 10, tone: 'dark', top: 'flat', covers: [1] },
+        { kind: 'chipset', at: [132, 181, 233, 259], tall: 11, tone: 'dark', top: 'slashes', cuts: [['tl', 30]] },
+        { kind: 'm2', at: [98, 259, 232, 280], tall: 10, tone: 'dark', top: 'flat', cuts: [['bl', 8]], covers: [2] },
+      ],
+      slots: [{ row: 3, size: 'x1', steel: false }, { row: 4, size: 'x1', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[154, 166, -1], [141, 230, -1], [112, 268, 1]],
+      sataEdge: 4, sataAt: 240,
+    },
   },
   {
     id: 'gigabyte-x870-aorus-elite-wifi7', category: 'motherboard', brand: 'Gigabyte',
@@ -43,6 +80,22 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       { maxLength: 110, interfaces: ['nvme'] },
     ],
     sataPorts: 4, pcieX16Slots: 3, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [127, 93],
+      eps: [[49, 6], [69, 6]],
+      sinks: [
+        { kind: 'io', at: [-5, 0, 49, 157], tall: 42, tone: 'light', top: 'flat', cuts: [['br', 18]] },
+        { kind: 'vrm', at: [49, 9, 72, 154], tall: 30, tone: 'light', top: 'flat' },
+        { kind: 'vrm', at: [78, 0, 161, 30], tall: 28, tone: 'light', top: 'flat' },
+        { kind: 'm2', at: [33, 155, 161, 180], tall: 10, tone: 'light', top: 'slashes', covers: [0] },
+        { kind: 'm2', at: [33, 196, 162, 261], tall: 10, tone: 'light', top: 'flat', covers: [1, 2, 3] },
+        { kind: 'chipset', at: [162, 187, 232, 262], tall: 11, tone: 'light', top: 'slashes' },
+      ],
+      slots: [{ row: 4, size: 'x16', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[151, 167, -1], [151, 205, -1], [151, 227, -1], [151, 250, -1]],
+      sataEdge: 4, sataAt: 230,
+      battery: [224, 283],
+    },
   },
   {
     id: 'msi-mag-z790-tomahawk-wifi', category: 'motherboard', brand: 'MSI', name: 'MAG Z790 Tomahawk WiFi',
@@ -57,6 +110,23 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       { maxLength: 80, interfaces: ['nvme'] },
     ],
     sataPorts: 7, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [131, 87],
+      eps: [[51, 8], [70, 8]],
+      sinks: [
+        { kind: 'io', at: [-8, 0, 49, 163], tall: 40, tone: 'light', top: 'groovesAcross', cuts: [['br', 18]] },
+        { kind: 'vrm', at: [49, 23, 73, 151], tall: 30, tone: 'light', top: 'flat', cuts: [['br', 12]] },
+        { kind: 'vrm', at: [83, 0, 177, 33], tall: 28, tone: 'light', top: 'slashes' },
+        { kind: 'm2', at: [32, 155, 160, 177], tall: 10, tone: 'light', top: 'slashes', covers: [0] },
+        { kind: 'm2', at: [51, 198, 159, 236], tall: 10, tone: 'light', top: 'slashes', covers: [1] },
+        { kind: 'chipset', at: [159, 175, 231, 258], tall: 10, tone: 'light', top: 'slashes', cuts: [['tl', 12], ['tr', 12]] },
+        { kind: 'm2', at: [28, 258, 231, 279], tall: 10, tone: 'light', top: 'slashes', covers: [2, 3] },
+      ],
+      slots: [{ row: 3, size: 'x1', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[156, 165, -1], [153, 212, -1], [120, 268, -1], [212, 268, -1]],
+      sataEdge: 6, sataAt: 230,
+      battery: [27, 233],
+    },
   },
   {
     id: 'msi-pro-z790-p-wifi-ddr4', category: 'motherboard', brand: 'MSI', name: 'PRO Z790-P WiFi DDR4',
@@ -71,6 +141,20 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       { maxLength: 80, interfaces: ['nvme', 'sata'] },
     ],
     sataPorts: 6, pcieX16Slots: 3, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [127, 87],
+      eps: [[48, 8], [67, 8]],
+      sinks: [
+        { kind: 'vrm', at: [6, 18, 61, 131], tall: 30, tone: 'dark', top: 'slashes', cuts: [['tl', 14]] },
+        { kind: 'vrm', at: [80, 0, 176, 35], tall: 28, tone: 'dark', top: 'slashes' },
+        { kind: 'm2', at: [38, 152, 160, 173], tall: 9, tone: 'dark', top: 'groovesDown', covers: [0] },
+        { kind: 'chipset', at: [166, 192, 215, 256], tall: 9, tone: 'dark', top: 'flat' },
+      ],
+      slots: [{ row: 2, size: 'x1', steel: false }, { row: 3, size: 'x16', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[156, 162, -1], [156, 226, -1], [124, 268, -1], [216, 268, -1]],
+      sataEdge: 4, sataAt: 257,
+      battery: [27, 201],
+    },
   },
   {
     id: 'msi-mag-z890-tomahawk-wifi', category: 'motherboard', brand: 'MSI', name: 'MAG Z890 Tomahawk WiFi',
@@ -85,6 +169,23 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       { maxLength: 80, interfaces: ['nvme', 'sata'] },
     ],
     sataPorts: 4, pcieX16Slots: 3, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [132, 87],
+      eps: [[190, 7], [210, 7]],
+      sinks: [
+        { kind: 'io', at: [-8, 0, 55, 163], tall: 42, tone: 'dark', top: 'slashes', cuts: [['tr', 24]] },
+        { kind: 'vrm', at: [55, 24, 83, 157], tall: 30, tone: 'dark', top: 'flat', cuts: [['tr', 10]] },
+        { kind: 'vrm', at: [55, 0, 176, 30], tall: 28, tone: 'dark', top: 'flat' },
+        { kind: 'm2', at: [32, 157, 160, 180], tall: 10, tone: 'dark', top: 'groovesAcross', covers: [0] },
+        { kind: 'm2', at: [31, 200, 161, 236], tall: 10, tone: 'dark', top: 'groovesAcross', covers: [1] },
+        { kind: 'chipset', at: [162, 180, 229, 259], tall: 11, tone: 'dark', top: 'groovesAcross' },
+        { kind: 'm2', at: [24, 259, 229, 279], tall: 10, tone: 'dark', top: 'flat', covers: [2, 3] },
+      ],
+      slots: [{ row: 3, size: 'x16', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[134, 165, -1], [149, 209, -1], [120, 268, -1], [212, 268, -1]],
+      sataEdge: 4, sataAt: 269,
+      battery: [26, 232],
+    },
   },
   {
     id: 'asus-tuf-gaming-b650m-plus-wifi', category: 'motherboard', brand: 'ASUS',
@@ -98,6 +199,21 @@ export const MOTHERBOARDS: MotherboardPart[] = [
     ],
     // One 8-pin CPU socket plus a 4-pin +12 V.
     sataPorts: 4, pcieX16Slots: 2, epsConnectors: 1, fanHeaders: 6,
+    look: {
+      socket: [128, 92],
+      eps: [[60, 7], [45, 7]],
+      sinks: [
+        { kind: 'io', at: [-8, 0, 21, 165], tall: 40, tone: 'light', top: 'flat', cuts: [['tr', 8]] },
+        { kind: 'vrm', at: [22, 15, 71, 163], tall: 30, tone: 'dark', top: 'blocks' },
+        { kind: 'vrm', at: [73, 0, 166, 32], tall: 28, tone: 'dark', top: 'blocks' },
+        { kind: 'm2', at: [73, 155, 178, 177], tall: 9, tone: 'light', top: 'flat', covers: [0] },
+        { kind: 'm2', at: [68, 198, 168, 220], tall: 9, tone: 'dark', top: 'flat', covers: [1] },
+        { kind: 'chipset', at: [174, 183, 214, 237], tall: 8, tone: 'dark', top: 'flat', cuts: [['tl', 10]] },
+      ],
+      slots: [{ row: 1, size: 'x1', steel: false }, { row: 2, size: 'x16', steel: false }],
+      m2: [[156, 166, -1], [163, 208, -1]],
+      sataEdge: 3, sataAt: 208,
+    },
   },
   {
     id: 'asus-rog-strix-b650e-i-gaming-wifi', category: 'motherboard', brand: 'ASUS',
@@ -110,5 +226,20 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       { maxLength: 80, interfaces: ['nvme'] },
     ],
     sataPorts: 2, pcieX16Slots: 1, epsConnectors: 1, fanHeaders: 3,
+    look: {
+      socket: [87, 72],
+      eps: [[17, 6]],
+      sinks: [
+        { kind: 'io', at: [-8, 0, 26, 136], tall: 45, tone: 'dark', top: 'flat' },
+        { kind: 'vrm', at: [26, 12, 51, 116], tall: 32, tone: 'dark', top: 'finsAcross' },
+        // The chipset heatsink, and over it a plate covering the M.2 drive that sits on a raised board above
+        { kind: 'chipset', at: [5, 127, 136, 156], tall: 14, tone: 'dark', top: 'flat' },
+        { kind: 'm2', at: [5, 127, 136, 156], tall: 24, tone: 'dark', top: 'flat', cuts: [['bl', 8], ['tr', 8]], covers: [0] },
+      ],
+      slots: [],
+      // The second socket is on the back of the real board. It is drawn on the front so the drive can be seen going in.
+      m2: [[117, 142, -1, 14], [52, 114, 1]],
+      sataEdge: 0,
+    },
   },
 ];

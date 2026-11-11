@@ -18,9 +18,10 @@ come together.
   slots show a green outline; a part that does not fit shows red with the
   reason, shakes and backs out.
 - **A seating animation per part:** the socket frame opens for the CPU, memory
-  clips snap shut, an M.2 drive goes in at an angle and is pressed flat, cooler
-  fans clip on last, a radiator slides in and its hoses run to the pump, the
-  graphics card latches.
+  clips snap shut, the heatsink over an M.2 socket swings up, the drive goes in
+  at an angle and is pressed flat and the heatsink comes back down, cooler fans
+  clip on last (and a cooler with a lid gets it after them), a radiator slides
+  in and its hoses run to the pump, the graphics card latches.
 - **Cables:** once both ends are in the case the build panel lists the cable
   (24-pin, CPU power, graphics power, SATA, cooler, front panel). Each is a
   step like any part: it plugs in, then runs along its route. The machine will
@@ -39,9 +40,30 @@ come together.
   part under the pointer, or the one going in, is drawn dark and named, and a
   click on it opens its page. Every part in the catalog gets its own small
   drawing, made in the browser from the same model.
-- **Parts drawn from what they are:** processor lids differ by socket, coolers
-  show their heat pipes and covers, memory shows its heat-spreader outline,
-  graphics cards their fins, backplate and bracket.
+- **Parts drawn from what they are:** processor lids differ by socket and
+  memory shows its heat-spreader outline.
+- **Graphics cards modelled on the real ones:** each of the nine has its own
+  fans (size, blade count, whether a ring joins the blade tips), shroud outline
+  and face, backplate (the opening past the end of the board, the window round
+  the bracket behind the chip), the edge you see in the case (where the fins
+  show, where the name plate and light strip sit), power sockets where the card
+  has them, usually in a notch, and its own tail and bracket vents. A card's
+  own drawing shows it fans first.
+- **Coolers modelled on the real ones:** heat pipes bend up out of the base
+  into the fins in the pattern each cooler has; towers are as deep as the real
+  ones (one twin tower has a slimmer front tower and sits off-centre); tops are
+  bare pipe ends, capped ends, a plate, a gridded cover or one lid over both
+  towers; fins are cut back at the foot where the real ones clear memory; fans
+  carry their blade counts and wire clips. The two liquid coolers have their
+  own pump blocks: a rounded square with a disc on top, and a round head with a
+  ring of vanes.
+- **Boards modelled on the real ones:** each of the eight has its own port
+  cover, power-stage heatsinks, chipset plate and M.2 heatsinks where they sit
+  on the real board, its own expansion slots on the slot grid, its M.2 sockets
+  facing the way they really do, its CPU socket, CPU power sockets, SATA ports
+  and coin cell in their places. One board leaves three M.2 sockets bare, one
+  covers three with a single plate, and the Mini-ITX board carries a drive on
+  a raised deck over its chipset.
 - **Cases modelled on the real ones:** each of the four has its own front
   (wooden slats in a frame, a stood-off panel of triangular holes, round
   perforation, fine mesh with the fans showing through), its own roof, port
@@ -63,7 +85,7 @@ build to another case (the case can change only while empty).
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # rules, build state and page rendering
+npm test           # rules, build state, page rendering, catalog drawing data
 npm run build
 npm run measure    # speed and interaction checks against the build
 ```
@@ -131,11 +153,19 @@ shaded (CPU and GPU together, at 2880 x 1800, timed by forcing the GPU to
 finish). The script reports when the display is capped by power saving, since
 no page can be shown to be smoother than the browser's own frame interval.
 
-The table predates the modelled cases and rear panel. That change was timed
-back to back with the version before it, on the same machine while it was busy
-with other work: a line-drawing frame cost 8.1 ms after and 8.8 ms before, a
-shaded frame 9.6 ms after and 8.8 ms before, and the first load grew to
-149 KB. The whole table has not been re-run on a quiet machine since.
+The table predates the modelled cases, rear panel, cards, coolers and boards.
+Those changes were each timed back to back with the version before them, on
+the same machine while it was busy with other work. For the cases and rear
+panel a line-drawing frame cost 8.1 ms after and 8.8 ms before, and a shaded
+frame 9.6 ms after and 8.8 ms before. For the cards, coolers and boards, five
+alternating runs of the same full build gave 7.0 to 10.9 ms per line-drawing
+frame after (median 10.1) and 8.1 to 9.5 ms before (median 8.8), and 8.3 to
+11.2 ms shaded after against 9.2 to 10.5 before: the two overlap, and that
+machine could not tell them apart more finely. The same build takes 967 draw
+calls where it took 1019, because a fan's blades are now one shape. A run of
+`npm run measure` on that busy machine still showed no late frames in 1030 and
+none drawn while idle; first paint was 40 ms and the first load 155 KB. The
+whole table has not been re-run on a quiet machine since.
 
 The throttled column slows the CPU and network only; the GPU is still this
 machine's. Nothing has been measured on a phone or a low-end laptop, and only
@@ -145,12 +175,28 @@ Chrome has been run.
 
 Specs in `src/catalog/data` were entered by hand from each manufacturer's own
 product page on 11 November 2026, and every part records the page it came from.
-Cases, coolers, memory and power supplies also carry a `look` entry, read from
-the same pages' text and photos: what the front panel is and how it is
-perforated, how many heat pipes, the shape of a heat spreader's top. Boards
-record their rear ports column by column and graphics cards their display
-outputs. These are used only to draw the parts. Two power supplies have
-three-armed exhaust cut-outs that are drawn as triangles.
+Every category but processors and drives also carries a `look` entry, read
+from the same pages' text and photos: what a case's front panel is and how it
+is perforated, the shape of a heat spreader's top, a card's fans, shroud,
+backplate and edges, a cooler's pipes, stacks and top, and where each heatsink,
+slot and socket sits on a board. Boards also record their rear ports column by
+column and graphics cards their display outputs. These are used only to draw
+the parts. Two power supplies have three-armed exhaust cut-outs that are drawn
+as triangles.
+
+What a photo gives is not a measurement. Board positions were read off each
+maker's top-down photo and its manual's layout drawing, to within a few
+millimetres, and laid on this project's slot grid; heatsink heights are
+estimates, since a photo from above does not show them. Card fan sizes and
+board lengths are estimates from photos except where the data file says
+otherwise, and one card's blade count could not be counted from its maker's
+photos. Three coolers' maker sites would not load, so those were read from
+their data sheets and from reviews' photos of the same model. The Mini-ITX
+board's second M.2 socket is on its back; it is drawn on the front so the
+drive can be seen going in. A cover over an M.2 socket swings up on a hinge
+here; the real ones unscrew and lift off. Small parts on a board that the
+catalog does not record (chokes, headers, the memory and 24-pin sockets) are in
+a usual arrangement for the board's size, not that board's own.
 Where a maker does not print a value it is marked in the data file: for example
 AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model
