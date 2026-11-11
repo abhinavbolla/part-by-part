@@ -109,3 +109,16 @@ AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model
 names are used only to identify the parts; this project is not affiliated with
 any of the manufacturers.
+
+## License
+
+[MIT](LICENSE), © 2026 Abhinav Bolla. That covers this project's code and the
+parts data as entered here.
+
+- **three.js** is the one third-party library that ships with the site. It is
+  MIT licensed, © three.js authors; the build writes its notice to
+  `THIRD-PARTY-LICENSES.txt`.
+- **Product and company names** belong to their owners. The license does not
+  grant any right to those names or marks.
+- There are no third-party fonts, icons, images or 3D models in this
+  repository: icons and parts are drawn in code.
