@@ -7,14 +7,15 @@
 <meta name="description" content="Build a PC part by part: seat real components in a case and watch it come together.">
 <meta name="theme-color" content="#f3f1ec">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='1' width='10' height='14' rx='1.5' fill='%231c1d1f'/%3E%3Ccircle cx='8' cy='5' r='1.6' fill='%23f3f1ec'/%3E%3C/svg%3E">
+<!--preload-->
 <!--css-->
 </head>
 <body>
 <!--sprite-->
 <canvas id="view" aria-label="3D view of the build"></canvas>
 <aside id="tray" class="panel">
-<header><h1>PC Builder</h1><p><!--case--></p></header>
-<div class="scroll"><!--tray--></div>
+<header><a class="home" data-nav href="/"><h1>PC Builder</h1></a><input id="search" type="search" placeholder="Search parts" autocomplete="off" spellcheck="false" aria-label="Search parts"></header>
+<div id="panel" class="scroll"><!--panel--></div>
 <footer>Drag a part to its slot, or click to seat it.</footer>
 </aside>
 <aside id="status" class="panel" aria-live="polite"><!--status--></aside>
@@ -29,6 +30,7 @@
 <div id="chip" hidden></div>
 <p id="notice" role="status" hidden></p>
 <pre id="hud" hidden></pre>
+<!--boot-->
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

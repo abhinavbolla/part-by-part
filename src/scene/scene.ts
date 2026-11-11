@@ -9,6 +9,7 @@ import {
   EdgesGeometry,
   Group,
   HemisphereLight,
+  InstancedMesh,
   LineBasicMaterial,
   LineSegments,
   Mesh,
@@ -28,19 +29,23 @@ import {
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import type { BuildStore, Change } from '../build/store.ts';
-import type { Part } from '../catalog/types.ts';
+import type { MotherboardPart, Step, StoragePart } from '../catalog/types.ts';
+import { radiatorMount, slotsFrom, storageMounts, type Slots, type StorageMount } from '../rules/compat.ts';
 import { HOVER, clamp01, easeOut, seg } from './anim.ts';
-import { shadows } from './kit.ts';
-import { caseLayout } from './layout.ts';
+import { M, disposeModel, glowMat, shadows, tube } from './kit.ts';
+import { boardLayout, caseLayout, type BoardLayout } from './layout.ts';
 import { buildBoard, type BoardModel } from './models/board.ts';
+import { buildCable } from './models/cables.ts';
 import { buildCase } from './models/case.ts';
 import {
-  buildCooler,
+  buildAirCooler,
   buildCpu,
+  buildDrive25,
   buildGpu,
+  buildLiquidCooler,
+  buildM2,
   buildPsu,
   buildRam,
-  buildStorage,
 } from './models/components.ts';
 import type { Fixtures, PartModel } from './models/types.ts';
 
@@ -61,11 +66,13 @@ export interface SceneStats {
   settled: boolean;
   /** Frames rendered since load; stays put while nothing is happening. */
   rendered: number;
+  /** Frames that took over 30 ms, with the timeline position they happened at. */
+  slow: { at: number; ms: number }[];
 }
 
 export type DropResult = 'drop' | 'reject' | 'cancel';
 
-/** A part outside the timeline: leaving, being offered, or bouncing off. */
+/** A step outside the timeline: leaving, being offered, or bouncing off. */
 interface Loose {
   p: number;
   target: number;
@@ -83,8 +90,6 @@ const SNAP_PX = 120;
 const SHAKE = 0.42;
 
 export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets: () => Insets) {
-  const lay = caseLayout(store.pcCase);
-
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -103,12 +108,12 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   sun.target.position.set(0, 200, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -480;
-  sun.shadow.camera.right = 480;
-  sun.shadow.camera.top = 480;
-  sun.shadow.camera.bottom = -480;
+  sun.shadow.camera.left = -500;
+  sun.shadow.camera.right = 500;
+  sun.shadow.camera.top = 500;
+  sun.shadow.camera.bottom = -500;
   sun.shadow.camera.near = 200;
-  sun.shadow.camera.far = 2200;
+  sun.shadow.camera.far = 2300;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.8;
   scene.add(sun, sun.target);
@@ -118,23 +123,37 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const caseModel = buildCase(store.pcCase, lay);
-  shadows(caseModel.group);
-  scene.add(caseModel.group);
-  const boardFrame = new Group();
-  boardFrame.position.set(lay.board.x, lay.board.y, lay.board.z);
-  caseModel.group.add(boardFrame);
+  // ---- the case ------------------------------------------------------------
 
-  // ---- part models ---------------------------------------------------------
+  let lay = caseLayout(store.pcCase);
+  let caseModel = buildCase(store.pcCase, lay);
+  let boardFrame = new Group();
+
+  function mountCase(): void {
+    lay = caseLayout(store.pcCase);
+    caseModel = buildCase(store.pcCase, lay);
+    shadows(caseModel.group);
+    scene.add(caseModel.group);
+    boardFrame = new Group();
+    boardFrame.position.set(lay.board.x, lay.board.y, lay.board.z);
+    caseModel.group.add(boardFrame);
+  }
+  mountCase();
+
+  // ---- step models ---------------------------------------------------------
 
   const models = new Map<string, PartModel>();
+  const signatures = new Map<string, string>();
   const lastP = new Map<string, number>();
   const ghostBoxes = new Map<string, Box3[]>();
   const centers = new Map<string, Vector3>();
   const loose = new Map<string, Loose>();
 
+  const boardPart = (): MotherboardPart | undefined =>
+    store.steps.find((step): step is MotherboardPart => step.category === 'motherboard');
+  const currentLayout = (): BoardLayout => boardLayout(boardPart()?.formFactor ?? 'ATX');
   const currentBoard = (): BoardModel | undefined => {
-    const part = store.steps.find((step) => step.category === 'motherboard');
+    const part = boardPart();
     return part ? (models.get(part.id) as BoardModel | undefined) : undefined;
   };
   const fixtures: Fixtures = {
@@ -142,39 +161,95 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     dimm: (open) => currentBoard()?.dimm(open),
     latch: (open) => currentBoard()?.latch(open),
   };
+  /** Everything in the timeline, including undone steps, so their geometry can be found. */
+  const allSlots = (): Slots => slotsFrom(store.pcCase, store.steps, store.mounts);
 
-  function build(part: Part): PartModel {
-    switch (part.category) {
-      case 'motherboard': return buildBoard(part, lay);
-      case 'cpu': return buildCpu(part, fixtures);
-      case 'cooler': return buildCooler(part);
-      case 'ram': return buildRam(part, fixtures);
-      case 'storage': return buildStorage(part);
-      case 'gpu': return buildGpu(part, fixtures);
-      case 'psu': return buildPsu(part, lay);
+  function mountOf(drive: StoragePart): StorageMount {
+    const kept = store.mounts.get(drive.id);
+    if (kept) return kept;
+    const next = slotsFrom(store.pcCase, [...store.installed, drive], store.mounts);
+    return storageMounts(next).get(drive.id) ?? { kind: drive.formFactor === 'M.2' ? 'm2' : 'bay', index: 0 };
+  }
+
+  /** What a step's shape depends on. When it changes the model is rebuilt. */
+  function signature(step: Step): string {
+    const board = boardPart()?.id ?? '-';
+    switch (step.category) {
+      case 'motherboard':
+      case 'psu':
+        return '';
+      case 'storage': {
+        const mount = mountOf(step);
+        return mount.kind === 'm2' ? `${board}|m2:${mount.index}` : `bay:${mount.index}`;
+      }
+      case 'cooler':
+        return step.kind === 'aio' ? `${board}|${radiatorMount(store.pcCase, step)}` : board;
+      case 'cable': {
+        const slots = allSlots();
+        const mount = step.target ? store.mounts.get(step.target) : undefined;
+        return [board, slots.gpu?.id, slots.psu?.id, slots.cooler?.id, mount?.index].join('|');
+      }
+      default:
+        return board;
     }
   }
 
-  function ensure(part: Part): PartModel {
-    let model = models.get(part.id);
-    if (model) return model;
-    model = build(part);
+  function build(step: Step): PartModel {
+    const bl = step.category === 'motherboard' ? boardLayout(step.formFactor) : currentLayout();
+    switch (step.category) {
+      case 'motherboard': return buildBoard(step, lay, bl);
+      case 'cpu': return buildCpu(step, bl, fixtures);
+      case 'cooler':
+        return step.kind === 'aio'
+          ? buildLiquidCooler(step, lay, bl, radiatorMount(store.pcCase, step) ?? 'top')
+          : buildAirCooler(step, bl);
+      case 'ram': return buildRam(step, bl, fixtures);
+      case 'storage': {
+        const mount = mountOf(step);
+        return mount.kind === 'm2' ? buildM2(step, bl, mount.index) : buildDrive25(step, lay, mount.index);
+      }
+      case 'gpu': return buildGpu(step, bl, fixtures);
+      case 'psu': return buildPsu(step, lay);
+      case 'cable':
+        return buildCable(step, { lay, bl, slots: allSlots(), mounts: new Map(store.mounts) });
+    }
+  }
+
+  function drop(id: string): void {
+    const model = models.get(id);
+    if (model) disposeModel(model.group);
+    models.delete(id);
+    signatures.delete(id);
+    ghostBoxes.delete(id);
+    centers.delete(id);
+  }
+
+  function ensure(step: Step): PartModel {
+    const wanted = signature(step);
+    const existing = models.get(step.id);
+    if (existing && signatures.get(step.id) === wanted) return existing;
+    const shown = existing ? lastP.get(step.id) ?? 0 : 0;
+    if (existing) drop(step.id);
+
+    const model = build(step);
     shadows(model.group);
     (model.frame === 'board' ? boardFrame : caseModel.group).add(model.group);
-    models.set(part.id, model);
+    models.set(step.id, model);
+    signatures.set(step.id, wanted);
 
     // Measure where it ends up (for the drop target) and where it hovers.
     model.group.visible = true;
     model.setProgress(1, false);
     caseModel.group.updateMatrixWorld(true);
-    ghostBoxes.set(part.id, (model.ghostTargets ?? [model.group]).map((target) =>
+    ghostBoxes.set(step.id, (model.ghostTargets ?? [model.group]).map((target) =>
       new Box3().setFromObject(target).expandByScalar(1.5)));
     model.setProgress(HOVER, false);
     caseModel.group.updateMatrixWorld(true);
-    centers.set(part.id, new Box3().setFromObject(model.group).getCenter(new Vector3()));
+    centers.set(step.id, new Box3().setFromObject(model.group).getCenter(new Vector3()));
     model.setProgress(0, false);
     model.group.visible = false;
-    lastP.set(part.id, 0);
+    lastP.set(step.id, 0);
+    if (shown > 0) pose(step.id, shown, false, true);
     return model;
   }
 
@@ -202,15 +277,15 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     ok: new LineBasicMaterial({ color: 0x1f9d55, transparent: true, opacity: 0.9, depthTest: false }),
     bad: new LineBasicMaterial({ color: 0xd6452f, transparent: true, opacity: 0.9, depthTest: false }),
   };
-  let ghostPart: Part | null = null;
+  let ghostStep: Step | null = null;
 
-  function showGhost(part: Part | null, blocked = false): void {
+  function showGhost(step: Step | null, blocked = false): void {
     ghost.clear();
-    ghostPart = part;
-    if (part) {
-      ensure(part);
+    ghostStep = step;
+    if (step) {
+      ensure(step);
       const kind = blocked ? 'bad' : 'ok';
-      for (const bounds of ghostBoxes.get(part.id) ?? []) {
+      for (const bounds of ghostBoxes.get(step.id) ?? []) {
         const size = bounds.getSize(new Vector3());
         const center = bounds.getCenter(new Vector3());
         const fill = new Mesh(unitBox, ghostFill[kind]);
@@ -261,6 +336,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       objectH / 2 / (tan * (freeH / height)),
       objectW / 2 / (tan * (freeW / height)),
     );
+    center.set(0, lay.H * 0.48, 0);
     camera.updateProjectionMatrix();
     invalidate();
   }
@@ -290,32 +366,53 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   // ---- timeline ------------------------------------------------------------
 
-  /** Visual cursor: part i is at progress clamp(s - i). Chases store.cursor. */
-  let s = 0;
+  /** Visual cursor: step i is at progress clamp(s - i). Chases store.cursor. */
+  let s = store.cursor;
   let scrubbing = false;
   let lastReported = -1;
   let onProgress: ((value: number) => void) | null = null;
 
+  /** Anything on screen that is no longer in the timeline leaves. */
   function reconcile(): void {
-    const inSteps = new Set(store.steps.map((part) => part.id));
+    const inSteps = new Set(store.steps.map((step) => step.id));
     for (const [id, p] of lastP) {
-      if (p > 0 && !inSteps.has(id) && !loose.has(id) && visitor?.part.id !== id) {
+      if (p > 0 && !inSteps.has(id) && !loose.has(id) && visitor?.step.id !== id) {
         loose.set(id, { p, target: 0, drive: true, shake: 0 });
       }
     }
   }
 
+  function swapCase(): void {
+    showGhost(null);
+    for (const id of [...models.keys()]) drop(id);
+    lastP.clear();
+    loose.clear();
+    visitor = null;
+    caseModel.group.removeFromParent();
+    mountCase();
+    s = store.cursor;
+    resize();
+  }
+
   function onStoreChange(change: Change): void {
     setPower(false);
-    if (change.kind === 'install' && change.part && change.index !== undefined) {
-      ensure(change.part);
-      const start = loose.get(change.part.id)?.p ?? 0;
-      loose.delete(change.part.id);
-      s = change.index + start; // anything still seating before it finishes at once
-    } else if (change.kind === 'remove' && change.part && change.index !== undefined) {
+    if (change.kind === 'case') {
+      swapCase();
+      return;
+    }
+    if (change.kind === 'reset') {
+      s = store.cursor;
+    } else if (change.kind === 'install' && change.step && change.index !== undefined) {
+      ensure(change.step);
+      const start = loose.get(change.step.id)?.p ?? 0;
+      loose.delete(change.step.id);
+      // A dropped step carries on from where it is held, so whatever was still
+      // seating before it finishes at once. A clicked one waits its turn.
+      s = start > 0 ? change.index + start : Math.min(s, change.index);
+    } else if (change.kind === 'remove' && change.step && change.index !== undefined) {
       const p = clamp01(s - change.index);
       if (s > change.index) s = Math.max(change.index, s - 1);
-      if (p > 0) loose.set(change.part.id, { p, target: 0, drive: true, shake: 0 });
+      if (p > 0) loose.set(change.step.id, { p, target: 0, drive: true, shake: 0 });
     }
     reconcile();
     invalidate();
@@ -335,10 +432,10 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     return s;
   }
 
-  // ---- offering a part: drag, drop, reject ---------------------------------
+  // ---- offering a step: drag, drop, reject ---------------------------------
 
   interface Visitor {
-    part: Part;
+    step: Step;
     model: PartModel;
     blocked: boolean;
     snapped: boolean;
@@ -352,23 +449,23 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   const hit = new Vector3();
   const projected = new Vector3();
 
-  function dragStart(part: Part, blocked: boolean): void {
-    const model = ensure(part);
-    loose.delete(part.id);
-    pose(part.id, HOVER, false, true);
+  function dragStart(step: Step, blocked: boolean): void {
+    const model = ensure(step);
+    loose.delete(step.id);
+    pose(step.id, HOVER, false, true);
     visitor = {
-      part,
+      step,
       model,
       blocked,
       snapped: false,
       hoverLocal: model.group.position.clone(),
-      centerWorld: centers.get(part.id)!.clone(),
+      centerWorld: centers.get(step.id)!.clone(),
     };
     model.group.visible = false;
-    showGhost(part, blocked);
+    showGhost(step, blocked);
   }
 
-  /** Moves the held part under the pointer. Returns true while it is snapped to its slot. */
+  /** Moves the held step under the pointer. Returns true while it is snapped to its slot. */
   function dragMove(clientX: number, clientY: number): boolean {
     if (!visitor) return false;
     const rect = canvas.getBoundingClientRect();
@@ -400,7 +497,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     visitor = null;
     showGhost(null);
     if (!held) return 'cancel';
-    const id = held.part.id;
+    const id = held.step.id;
     lastP.set(id, HOVER);
     if (!held.model.group.visible) {
       lastP.set(id, 0);
@@ -418,13 +515,13 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     return 'drop';
   }
 
-  /** A blocked part comes up to its slot, shakes, and goes away again. */
-  function bounce(part: Part): void {
-    ensure(part);
-    if (store.steps.some((step) => step.id === part.id)) return;
-    const from = loose.get(part.id)?.p ?? 0;
-    loose.set(part.id, { p: from, target: HOVER, drive: false, shake: SHAKE });
-    showGhost(part, true);
+  /** A blocked step comes up to its slot, shakes, and goes away again. */
+  function bounce(step: Step): void {
+    if (store.steps.some((item) => item.id === step.id)) return;
+    ensure(step);
+    const from = loose.get(step.id)?.p ?? 0;
+    loose.set(step.id, { p: from, target: HOVER, drive: false, shake: SHAKE });
+    showGhost(step, true);
     invalidate();
   }
 
@@ -443,7 +540,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     const goal = powered ? 1 : 0;
     if (power === goal && goal === 0) return false;
     power = goal > power ? Math.min(goal, power + dt / 1.6) : Math.max(goal, power - dt / 0.7);
-    const seated = new Set(store.installed.map((part) => part.id));
+    const seated = new Set(store.installed.map((step) => step.id));
     const spin = dt * 15 * power;
     for (const rotor of caseModel.rotors) rotor.rotation.z += spin;
     for (const material of caseModel.glow) material.emissiveIntensity = power * 1.6;
@@ -461,7 +558,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   let lastTime = 0;
   let pendingInput: number | null = null;
   let firstFrame = true;
-  const stats: SceneStats = { frames: [], inputLatency: null, drawCalls: 0, triangles: 0, settled: true, rendered: 0 };
+  const stats: SceneStats = { frames: [], inputLatency: null, drawCalls: 0, triangles: 0, settled: true, rendered: 0, slow: [] };
 
   function invalidate(): void {
     if (!raf) raf = requestAnimationFrame(frame);
@@ -499,7 +596,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
         model.group.position.x += Math.sin((1 - k) * Math.PI * 7) * 6 * k;
         if (item.shake <= 0) {
           item.target = 0;
-          if (ghostPart?.id === id && !visitor) showGhost(null);
+          if (ghostStep?.id === id && !visitor) showGhost(null);
         }
         active = true;
       } else if (item.target === 0) {
@@ -522,13 +619,15 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       const forward = s < target;
       const index = Math.max(0, Math.min(store.steps.length - 1, forward ? Math.floor(s) : Math.ceil(s) - 1));
       const duration = models.get(store.steps[index]?.id)?.duration ?? 2;
-      const rate = (forward ? 1 : 2) / duration;
+      // With steps queued up behind this one, go faster so the queue drains.
+      const backlog = Math.max(0, Math.abs(target - s) - 1);
+      const rate = ((forward ? 1 : 2) * (1 + backlog * 0.7)) / duration;
       s = forward ? Math.min(target, s + rate * dt) : Math.max(target, s - rate * dt);
       active = true;
     }
-    store.steps.forEach((part, i) => {
-      ensure(part);
-      pose(part.id, clamp01(s - i), true);
+    store.steps.forEach((step, i) => {
+      ensure(step);
+      pose(step.id, clamp01(s - i), true);
     });
     if (s !== lastReported) {
       lastReported = s;
@@ -556,8 +655,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     stats.triangles = renderer.info.render.triangles;
     stats.settled = !active && !visitor;
     if (lastTime && active) {
+      if (now - lastTime > 30) stats.slow.push({ at: Number(s.toFixed(2)), ms: Math.round(now - lastTime) });
       stats.frames.push(now - lastTime);
-      if (stats.frames.length > 900) stats.frames.shift();
+      if (stats.frames.length > 1800) stats.frames.shift();
     }
     if (pendingInput !== null) {
       stats.inputLatency = performance.now() - pendingInput;
@@ -571,41 +671,47 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     if (active) invalidate();
   }
 
+  const whenIdle = (task: () => void): void => {
+    if ('requestIdleCallback' in window) window.requestIdleCallback(task, { timeout: 600 });
+    else setTimeout(task, 60);
+  };
+
   /**
-   * Builds every part and draws it once while the page is idle, so shaders are
-   * compiled and geometry is uploaded before the first click needs them.
+   * Compiles every shader the parts will need, once, while the page is idle:
+   * a throwaway rig with one of each kind of material and geometry is drawn
+   * and removed. After this a new part costs only its own small buffers.
    */
-  function warm(parts: Part[], done?: () => void): void {
-    const queue = [...parts];
-    const whenIdle = (task: () => void): void => {
-      if ('requestIdleCallback' in window) window.requestIdleCallback(task, { timeout: 600 });
-      else setTimeout(task, 60);
-    };
-    const step = (): void => {
-      const part = queue.shift();
-      if (part) {
-        ensure(part);
-        whenIdle(step);
-        return;
-      }
-      const hidden = [...models].filter(([, model]) => !model.group.visible);
-      for (const [, model] of hidden) {
-        model.setProgress(1, false);
-        model.group.scale.setScalar(1);
-        model.group.visible = true;
-      }
-      // The drop-target outline uses its own shaders; draw one of those too.
-      const borrowGhost = !ghostPart && parts.length > 0;
-      if (borrowGhost) showGhost(parts[0]);
+  function warmShaders(done?: () => void): void {
+    whenIdle(() => {
+      const rig = new Group();
+      rig.position.copy(center);
+      Object.values(M).forEach((material, i) => {
+        const sample = new Mesh(unitBox, material);
+        sample.position.set(i * 3 - 60, 0, 0);
+        rig.add(sample);
+      });
+      rig.add(new InstancedMesh(unitBox, M.alu, 2));
+      tube(rig, [[0, 0, 0], [10, 10, 0], [20, 0, 0]], 2, M.cable);
+      rig.add(new Mesh(unitBox, glowMat(0xffffff, 0xffffff)));
+      rig.add(new Mesh(unitBox, ghostFill.ok), new LineSegments(unitEdges, ghostLine.ok));
+      shadows(rig);
+      scene.add(rig);
       renderer.render(scene, camera);
-      if (borrowGhost) showGhost(null);
-      for (const [id, model] of hidden) {
-        model.setProgress(lastP.get(id) ?? 0, false);
-        model.group.visible = false;
-      }
+      disposeModel(rig);
       renderer.render(scene, camera);
       done?.();
       performance.mark('scene-warm');
+    });
+  }
+
+  /** Builds the given steps a little at a time while the page is idle, ahead of a click. */
+  function warm(steps: Step[]): void {
+    const queue = [...steps];
+    const step = (): void => {
+      const next = queue.shift();
+      if (!next) return;
+      if (!visitor) ensure(next);
+      whenIdle(step);
     };
     whenIdle(step);
   }
@@ -615,8 +721,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   invalidate();
 
   return {
-    prepare: (part: Part): void => { ensure(part); },
+    prepare: (step: Step): void => { ensure(step); },
     warm,
+    warmShaders,
     showGhost,
     dragStart,
     dragMove,
@@ -624,7 +731,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     bounce,
     scrub,
     scrubEnd,
-    /** Rebuilds the machine from an empty case, one part after another. */
+    /** Rebuilds the machine from an empty case, one step after another. */
     replay(): void {
       setPower(false);
       s = 0;
@@ -642,8 +749,8 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     stats,
     /** Screen position of the current drop target, for the callout. */
     ghostScreen(): { x: number; y: number } | null {
-      if (!ghostPart) return null;
-      const boxes = ghostBoxes.get(ghostPart.id);
+      if (!ghostStep) return null;
+      const boxes = ghostBoxes.get(ghostStep.id);
       if (!boxes?.length) return null;
       const top = boxes[0].getCenter(new Vector3());
       top.y = Math.max(...boxes.map((bounds) => bounds.max.y));
