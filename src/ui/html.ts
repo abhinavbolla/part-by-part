@@ -26,7 +26,7 @@ export function specLine(item: CatalogItem): string {
     case 'cooler':
       return item.kind === 'aio'
         ? `Liquid · ${item.radiator.size} mm radiator`
-        : `Air · ${item.height} mm tall · ${item.fans} × ${item.fanSize} mm`;
+        : `Air · ${item.height} mm · ${item.fans} × ${item.fanSize}`;
     case 'ram':
       return `${item.ramType} · ${item.modules} × ${item.gbPerModule} GB · ${item.speed}`;
     case 'storage':

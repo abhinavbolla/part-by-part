@@ -314,6 +314,33 @@ async function interact(browser, profile) {
   expect((await page.locator('.wire.in').count()) === wires, 'all cables plug in');
   await snap('built');
 
+  // Pointing at a part in the drawing names it; clicking it opens its page.
+  const spot = await page.evaluate((id) => {
+    const scene = window.__pcb.scene();
+    const rect = document.getElementById('view').getBoundingClientRect();
+    for (let y = rect.top + 80; y < rect.bottom - 120; y += 12) {
+      for (let x = rect.left + 420; x < rect.right - 380; x += 12) {
+        if (scene.hoverAt(x, y) === id) return { x, y };
+      }
+    }
+    return null;
+  }, GPU);
+  expect(spot !== null, 'the graphics card can be found under the pointer');
+  if (spot) {
+    await page.mouse.move(spot.x - 3, spot.y - 3);
+    await page.mouse.move(spot.x, spot.y);
+    await page.waitForTimeout(250);
+    expect((await page.textContent('#chip')) === 'Dual GeForce RTX 4070' && await page.isVisible('#chip'), 'pointing at a part names it');
+    await snap('pointing');
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.waitForSelector(`.detail[data-id="${GPU}"]`, { timeout: 5000 }).catch(() => {});
+    expect(await page.evaluate(() => location.pathname) === `/parts/gpu/asus-dual-rtx-4070/`, 'clicking a part opens its page');
+    await page.mouse.move(700, 880);
+    await follow(page, '.crumbs a[href="/parts/gpu/"]', `.card[data-id="${GPU}"]`);
+    await settled(page);
+  }
+
   // Undo, redo, and a part that something depends on.
   await press(page, '#undo');
   await settled(page);

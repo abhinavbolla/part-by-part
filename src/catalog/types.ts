@@ -37,6 +37,17 @@ export interface CasePart extends Base {
   /** Radiator sizes each position accepts. */
   radiators: ByPosition;
   bays: { ssd25: number; hdd35: number };
+  /** What it looks like, as seen on the maker's page. Used only to draw it. */
+  look?: {
+    front: 'slats' | 'mesh' | 'solid' | 'glass';
+    /** Vertical bars across the front, when it is slatted. */
+    slats: number;
+    top: 'mesh' | 'solid' | 'slots';
+    frontIo: 'top-front' | 'top-side' | 'front';
+    ports: { usbA: number; usbC: number; audio: number };
+    feet: 'bars' | 'pads';
+    shroud: 'full' | 'vented' | 'none';
+  };
 }
 
 export interface M2Slot {
@@ -86,6 +97,14 @@ export interface AirCoolerPart extends CoolerBase {
   width: number;
   depth: number;
   towers: number;
+  /** What it looks like, as seen on the maker's page. Used only to draw it. */
+  look?: {
+    /** Heat pipes; each U-shaped pipe counts once. */
+    pipes: number;
+    /** A cover plate over the top of the fins. */
+    cover: boolean;
+    fanFrame: 'square' | 'round';
+  };
 }
 
 export interface LiquidCoolerPart extends CoolerBase {
@@ -93,6 +112,8 @@ export interface LiquidCoolerPart extends CoolerBase {
   radiator: { size: number; length: number; width: number; thickness: number };
   /** Pump block height above the CPU. */
   height: number;
+  /** What it looks like, as seen on the maker's page. Used only to draw it. */
+  look?: { block: 'round' | 'square'; blockFan: boolean };
 }
 
 export type CoolerPart = AirCoolerPart | LiquidCoolerPart;
@@ -104,6 +125,8 @@ export interface RamPart extends Base {
   gbPerModule: number;
   speed: number;
   height: number;
+  /** The top edge of its heat spreader, as seen on the maker's page. Used only to draw it. */
+  look?: { top: 'flat' | 'lightbar' | 'fins' | 'angled' };
 }
 
 export interface StoragePart extends Base {

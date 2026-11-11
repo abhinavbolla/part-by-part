@@ -144,8 +144,7 @@ attribute vec3 faceB;
 attribute float crease;
 uniform vec2 resolution;
 uniform float scale;
-uniform float outlineWidth;
-uniform float creaseWidth;
+uniform float emphasis;
 varying float vAcross;
 varying float vHalf;
 varying float vOutline;
@@ -160,7 +159,8 @@ void main() {
   bool outline = frontA != frontB;
   bool shown = outline || (crease > 0.5 && frontA && frontB);
 
-  float halfWidth = 0.5 * scale * (outline ? outlineWidth : creaseWidth);
+  // A little heavier when the part is picked out, as a pen would press harder.
+  float halfWidth = 0.5 * scale * (outline ? mix(1.0, 1.3, emphasis) : mix(0.8, 0.9, emphasis));
   float reach = halfWidth + 1.0;
   vec2 pa = a.xy / a.w * resolution * 0.5;
   vec2 pb = b.xy / b.w * resolution * 0.5;
@@ -182,8 +182,11 @@ void main() {
 }`;
 
 const FRAGMENT = /* glsl */ `
-uniform vec3 outlineColor;
-uniform vec3 creaseColor;
+uniform vec3 outlineRest;
+uniform vec3 creaseRest;
+uniform vec3 outlineLit;
+uniform vec3 creaseLit;
+uniform float emphasis;
 varying float vAcross;
 varying float vHalf;
 varying float vOutline;
@@ -191,42 +194,65 @@ varying float vOutline;
 void main() {
   float alpha = 1.0 - smoothstep(vHalf - 0.5, vHalf + 0.5, abs(vAcross));
   if (alpha < 0.02) discard;
-  gl_FragColor = vec4(mix(creaseColor, outlineColor, vOutline), alpha);
+  vec3 rest = mix(creaseRest, outlineRest, vOutline);
+  vec3 lit = mix(creaseLit, outlineLit, vOutline);
+  gl_FragColor = vec4(mix(rest, lit, emphasis), alpha);
   #include <colorspace_fragment>
 }`;
 
-/** One material draws every line in the scene. */
-export const edgeMaterial = new ShaderMaterial({
-  vertexShader: VERTEX,
-  fragmentShader: FRAGMENT,
-  side: DoubleSide,
-  // Blended, not cut out: each line fades over its last pixel, which is what
-  // keeps it smooth at any angle. Lines are drawn after the faces and leave
-  // depth alone, so a face in front still hides them.
-  transparent: true,
-  depthWrite: false,
-  uniforms: {
-    resolution: { value: new Vector2(1, 1) },
-    scale: { value: 1 },
-    outlineWidth: { value: 1.25 },
-    creaseWidth: { value: 0.85 },
-    outlineColor: { value: new Color(0x1c1c20) },
-    creaseColor: { value: new Color(0x9b9ba3) },
-  },
-});
+// Shared by every line material: the picture's size and the line colours.
+// At rest a drawing is light; what the pointer picks out goes dark.
+const shared = {
+  resolution: { value: new Vector2(1, 1) },
+  scale: { value: 1 },
+  outlineRest: { value: new Color(0xa3a3ab) },
+  creaseRest: { value: new Color(0xd3d3d9) },
+  outlineLit: { value: new Color(0x0a0a0a) },
+  creaseLit: { value: new Color(0x63636b) },
+};
+const materials = new Set<ShaderMaterial>();
+let linesVisible = true;
+
+/**
+ * A material for one thing's lines (a part, a cable, the case), so that thing
+ * can be picked out on its own. `uniforms.emphasis` runs from 0 (resting) to 1.
+ */
+export function lineMaterial(): ShaderMaterial {
+  const material = new ShaderMaterial({
+    vertexShader: VERTEX,
+    fragmentShader: FRAGMENT,
+    side: DoubleSide,
+    // Blended, not cut out: each line fades over its last pixel, which is what
+    // keeps it smooth at any angle. Lines are drawn after the faces and leave
+    // depth alone, so a face in front still hides them.
+    transparent: true,
+    depthWrite: false,
+    uniforms: { ...shared, emphasis: { value: 0 } },
+  });
+  material.visible = linesVisible;
+  materials.add(material);
+  return material;
+}
+
+export function releaseLineMaterial(material: ShaderMaterial): void {
+  materials.delete(material);
+  material.dispose();
+}
 
 /** Tells the lines how big the picture is, and how many device pixels make one line-width unit. */
 export function setEdgeView(width: number, height: number, scale: number): void {
-  edgeMaterial.uniforms.resolution.value.set(width, height);
-  edgeMaterial.uniforms.scale.value = scale;
+  shared.resolution.value.set(width, height);
+  shared.scale.value = scale;
 }
 
 export function setEdgesVisible(visible: boolean): void {
-  edgeMaterial.visible = visible;
+  linesVisible = visible;
+  for (const material of materials) material.visible = visible;
 }
 
-function addLines(parent: Mesh, geometry: InstancedBufferGeometry, own: boolean): void {
-  const lines = new Mesh(geometry, edgeMaterial);
+function addLines(parent: Mesh, geometry: InstancedBufferGeometry, own: boolean, material: ShaderMaterial): void {
+  const lines = new Mesh(geometry, material);
+  lines.raycast = () => {}; // the pointer picks shapes, never their lines
   lines.userData.lines = true;
   lines.userData.own = own;
   lines.frustumCulled = false;
@@ -261,7 +287,7 @@ function instancedEdges(mesh: InstancedMesh): EdgeList {
 }
 
 /** Gives every shape under `root` its lines. Shapes marked `noLines` (cables) are left plain. */
-export function outline(root: Object3D): void {
+export function outline(root: Object3D, material: ShaderMaterial): void {
   const meshes: Mesh[] = [];
   root.traverse((node) => {
     const mesh = node as Mesh;
@@ -270,7 +296,7 @@ export function outline(root: Object3D): void {
   for (const mesh of meshes) {
     mesh.userData.outlined = true;
     if ((mesh as InstancedMesh).isInstancedMesh) {
-      addLines(mesh, stripsFor(instancedEdges(mesh as InstancedMesh)), true);
+      addLines(mesh, stripsFor(instancedEdges(mesh as InstancedMesh)), true, material);
       continue;
     }
     let strips = built.get(mesh.geometry);
@@ -279,6 +305,6 @@ export function outline(root: Object3D): void {
       built.set(mesh.geometry, strips);
     }
     // Shapes that share a geometry share its lines; a one-off shape owns its own.
-    addLines(mesh, strips, false);
+    addLines(mesh, strips, false, material);
   }
 }

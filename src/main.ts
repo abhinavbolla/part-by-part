@@ -432,6 +432,8 @@ let suppressClick = false;
 
 function hover(item: CatalogItem | Step | null): void {
   if (press?.dragging) return;
+  // A row for something already in the case picks it out in the drawing.
+  scene?.emphasize(item && item.category !== 'case' && store.isInstalled(item.id) ? item.id : null);
   const step = item && item.category !== 'case' && !store.isInstalled(item.id) ? item : null;
   const id = step?.id ?? null;
   if (id === hovered) return;
@@ -610,22 +612,61 @@ window.addEventListener('keydown', (event) => {
 
 // ---- looking around ---------------------------------------------------------
 
-let orbit: { id: number; x: number; y: number } | null = null;
+let orbit: { id: number; x: number; y: number; moved: number } | null = null;
+let pointer: { x: number; y: number } | null = null;
+let picking = 0;
+
+/** Names the part under the pointer; the scene draws it dark. */
+function pick(): void {
+  picking = 0;
+  if (!scene || !pointer || orbit?.moved || press?.dragging) return;
+  const id = scene.hoverAt(pointer.x, pointer.y);
+  const step = id ? store.steps.find((item) => item.id === id) : undefined;
+  chip.hidden = !step;
+  if (step) {
+    chip.textContent = step.name;
+    chip.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 16}px)`;
+  }
+  canvas.style.cursor = step && !isCable(step) ? 'pointer' : '';
+}
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
-  orbit = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  orbit = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: 0 };
   canvas.setPointerCapture(event.pointerId);
-  canvas.classList.add('orbit');
 });
 canvas.addEventListener('pointermove', (event) => {
-  if (!orbit || event.pointerId !== orbit.id) return;
-  scene?.orbit(event.clientX - orbit.x, event.clientY - orbit.y);
-  orbit.x = event.clientX;
-  orbit.y = event.clientY;
+  pointer = { x: event.clientX, y: event.clientY };
+  if (orbit && event.pointerId === orbit.id) {
+    const dx = event.clientX - orbit.x;
+    const dy = event.clientY - orbit.y;
+    orbit.moved += Math.abs(dx) + Math.abs(dy);
+    // A press that barely moves is a click on a part, not a turn of the case.
+    if (orbit.moved > 4) {
+      canvas.classList.add('orbit');
+      chip.hidden = true;
+      scene?.orbit(dx, dy);
+    }
+    orbit.x = event.clientX;
+    orbit.y = event.clientY;
+    return;
+  }
+  if (!picking) picking = requestAnimationFrame(pick);
 });
-const endOrbit = (): void => {
+canvas.addEventListener('pointerleave', () => {
+  pointer = null;
+  scene?.hoverAt(-1e6, -1e6);
+  chip.hidden = true;
+});
+const endOrbit = (event: PointerEvent): void => {
+  const clicked = orbit && orbit.moved <= 4 && event.type === 'pointerup';
   orbit = null;
   canvas.classList.remove('orbit');
+  if (!clicked || !scene) return;
+  // A click on a part opens its page.
+  const id = scene.hoverAt(event.clientX, event.clientY);
+  const step = id ? store.steps.find((item) => item.id === id) : undefined;
+  if (step && !isCable(step)) void router.go(`/parts/${step.category}/${step.id}/`);
 };
 canvas.addEventListener('pointerup', endOrbit);
 canvas.addEventListener('pointercancel', endOrbit);

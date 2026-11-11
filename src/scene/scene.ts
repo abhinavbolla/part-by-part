@@ -29,6 +29,7 @@ import {
   WebGLRenderTarget,
   WebGLRenderer,
   type Object3D,
+  type ShaderMaterial,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
@@ -36,7 +37,7 @@ import type { BuildStore, Change } from '../build/store.ts';
 import type { CatalogItem, MotherboardPart, Step, StoragePart } from '../catalog/types.ts';
 import { radiatorMount, slotsFrom, storageMounts, type Slots, type StorageMount } from '../rules/compat.ts';
 import { HOVER, clamp01, easeOut, seg } from './anim.ts';
-import { outline, setEdgeView, setEdgesVisible } from './edges.ts';
+import { lineMaterial, outline, releaseLineMaterial, setEdgeView, setEdgesVisible } from './edges.ts';
 import { M, disposeModel, glowMat, setGlow, setLook, shadows, tube, type Look } from './kit.ts';
 import { boardLayout, caseLayout, type BoardLayout } from './layout.ts';
 import { buildBoard, type BoardModel } from './models/board.ts';
@@ -138,12 +139,14 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   let lay = caseLayout(store.pcCase);
   let caseModel = buildCase(store.pcCase, lay);
   let boardFrame = new Group();
+  let caseLines: ShaderMaterial | null = null;
 
   function mountCase(): void {
     lay = caseLayout(store.pcCase);
     caseModel = buildCase(store.pcCase, lay);
     shadows(caseModel.group);
-    outline(caseModel.group);
+    caseLines = lineMaterial();
+    outline(caseModel.group, caseLines);
     scene.add(caseModel.group);
     boardFrame = new Group();
     boardFrame.position.set(lay.board.x, lay.board.y, lay.board.z);
@@ -159,6 +162,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   const ghostBoxes = new Map<string, Box3[]>();
   const centers = new Map<string, Vector3>();
   const loose = new Map<string, Loose>();
+  /** Each model's line material, and which step a model's group belongs to. */
+  const linesOf = new Map<string, ShaderMaterial>();
+  const owners = new Map<Object3D, string>();
 
   const boardPart = (): MotherboardPart | undefined =>
     store.steps.find((step): step is MotherboardPart => step.category === 'motherboard');
@@ -228,7 +234,13 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   function drop(id: string): void {
     const model = models.get(id);
-    if (model) disposeModel(model.group);
+    if (model) {
+      owners.delete(model.group);
+      disposeModel(model.group);
+    }
+    const lines = linesOf.get(id);
+    if (lines) releaseLineMaterial(lines);
+    linesOf.delete(id);
     models.delete(id);
     signatures.delete(id);
     ghostBoxes.delete(id);
@@ -244,7 +256,11 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
     const model = build(step);
     shadows(model.group);
-    outline(model.group);
+    const lines = lineMaterial();
+    lines.uniforms.emphasis.value = linesOf.get(step.id)?.uniforms.emphasis.value ?? 0;
+    outline(model.group, lines);
+    linesOf.set(step.id, lines);
+    owners.set(model.group, step.id);
     (model.frame === 'board' ? boardFrame : caseModel.group).add(model.group);
     models.set(step.id, model);
     signatures.set(step.id, wanted);
@@ -445,6 +461,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     loose.clear();
     visitor = null;
     caseModel.group.removeFromParent();
+    if (caseLines) releaseLineMaterial(caseLines);
     mountCase();
     s = store.cursor;
     resize();
@@ -608,6 +625,68 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     return true;
   }
 
+  // ---- what is picked out ----------------------------------------------------
+
+  /** The step under the pointer in the scene, and the one whose row is hovered in a list. */
+  let pointed: string | null = null;
+  let named: string | null = null;
+
+  /** Finds the part under the pointer. The case itself hides what is behind it. */
+  function hoverAt(clientX: number, clientY: number): string | null {
+    let found: string | null = null;
+    if (!visitor) {
+      const rect = canvas.getBoundingClientRect();
+      ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      for (const hitAt of raycaster.intersectObject(caseModel.group, true)) {
+        let node: Object3D | null = hitAt.object;
+        let owner: string | undefined;
+        let hidden = false;
+        while (node && node !== caseModel.group) {
+          if (!node.visible) hidden = true;
+          owner ??= owners.get(node);
+          node = node.parent;
+        }
+        if (hidden) continue;
+        found = owner ?? null;
+        break;
+      }
+    }
+    if (found !== pointed) {
+      pointed = found;
+      invalidate();
+    }
+    return found;
+  }
+
+  /**
+   * Lines rest light. The part under the pointer, the one named in a list, the
+   * one being offered and the one going in or out are drawn dark, fading in.
+   */
+  function stepEmphasis(dt: number): boolean {
+    const lit = new Set<string>();
+    if (pointed) lit.add(pointed);
+    if (named) lit.add(named);
+    if (visitor) lit.add(visitor.step.id);
+    for (const id of loose.keys()) lit.add(id);
+    const target = scrubbing ? s : store.cursor;
+    if (s !== target && store.steps.length) {
+      const index = Math.max(0, Math.min(store.steps.length - 1, s < target ? Math.floor(s) : Math.ceil(s) - 1));
+      lit.add(store.steps[index].id);
+    }
+    let moving = false;
+    for (const [id, lines] of linesOf) {
+      const goal = lit.has(id) ? 1 : 0;
+      const level = lines.uniforms.emphasis;
+      if (level.value === goal) continue;
+      level.value = goal > level.value
+        ? Math.min(goal, level.value + dt / 0.12)
+        : Math.max(goal, level.value - dt / 0.28);
+      moving = true;
+    }
+    return moving;
+  }
+
   // ---- frame loop ----------------------------------------------------------
 
   let raf = 0;
@@ -691,6 +770,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     }
     if (stepLoose(dt)) active = true;
     if (applyPower(dt)) active = true;
+    if (stepEmphasis(dt)) active = true;
 
     const ease = 1 - Math.exp(-dt * 14);
     for (const key of ['az', 'el', 'zoom'] as const) {
@@ -804,10 +884,12 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     if (look !== 'drawing' || visitor || item.category === 'cable') return null;
     if (item.category === 'case') {
       const model = buildCase(item, caseLayout(item));
-      outline(model.group);
+      const lines = lineMaterial();
+      outline(model.group, lines);
       scene.add(model.group);
       const url = picture(model.group, w, h, scale);
       disposeModel(model.group);
+      releaseLineMaterial(lines);
       return url;
     }
     const model = ensure(item);
@@ -843,7 +925,8 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       tube(rig, [[0, 0, 0], [10, 10, 0], [20, 0, 0]], 2, M.cable);
       rig.add(new Mesh(unitBox, glowMat(0xffffff, 0xffffff)));
       shadows(rig);
-      outline(rig);
+      const rigLines = lineMaterial();
+      outline(rig, rigLines);
       const outlineSample = [new Mesh(unitBox, ghostFill.ok), new LineSegments(unitEdges, ghostLine.ok)];
       for (const item of outlineSample) item.layers.set(OVERLAY);
       ghost.add(...outlineSample);
@@ -851,6 +934,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       draw();
       ghost.remove(...outlineSample);
       disposeModel(rig);
+      releaseLineMaterial(rigLines);
       draw();
       done?.();
       performance.mark('scene-warm');
@@ -879,6 +963,13 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     warm,
     warmShaders,
     thumbnail,
+    hoverAt,
+    /** Picks out the part with this id (a row hovered in a list), or none. */
+    emphasize(id: string | null): void {
+      if (named === id) return;
+      named = id;
+      invalidate();
+    },
     showGhost,
     dragStart,
     dragMove,

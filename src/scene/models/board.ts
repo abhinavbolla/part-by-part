@@ -7,7 +7,7 @@ import { Group, type Object3D } from 'three';
 import type { MotherboardPart } from '../../catalog/types.ts';
 import { driveScrew, easeInOut, seg, travel, type Travel } from '../anim.ts';
 import { packageSize, type BoardLayout, type CaseLayout } from '../layout.ts';
-import { M, box, cyl, glowMat, rbox, screw } from '../kit.ts';
+import { M, box, copies, cyl, glowMat, rbox, screw } from '../kit.ts';
 import type { Fixtures, PartModel } from './types.ts';
 
 export interface BoardModel extends PartModel, Fixtures {}
@@ -18,11 +18,33 @@ export function buildBoard(part: MotherboardPart, lay: CaseLayout, bl: BoardLayo
 
   box(group, w, h, thickness, M.pcb, w / 2, -h / 2, -thickness / 2);
 
-  // Shrouds and heatsinks
+  // Shrouds and heatsinks. The finned ones have grooves cut across the short way.
   for (const item of bl.decor) {
     const material = item.tone === 'light' ? M.heatsink : item.tone === 'dark' ? M.heatsinkDark : M.slot;
     if (item.round) rbox(group, item.w, item.h, item.z, item.round, material, item.u, -item.v, item.z / 2);
     else box(group, item.w, item.h, item.z, material, item.u, -item.v, item.z / 2);
+    if (item.tone !== 'light') continue;
+    const long = Math.max(item.w, item.h);
+    const grooves = Math.floor(long / 9);
+    copies(group, grooves, M.slotAlt, (dummy, i) => {
+      const along = -long / 2 + (long * (i + 0.5)) / grooves;
+      if (item.w >= item.h) {
+        dummy.position.set(item.u + along, -item.v, item.z + 0.2);
+        dummy.scale.set(2.2, item.h - 5, 0.6);
+      } else {
+        dummy.position.set(item.u, -item.v + along, item.z + 0.2);
+        dummy.scale.set(item.w - 5, 2.2, 0.6);
+      }
+    });
+  }
+
+  // Rear ports standing proud of the board's edge, under the shroud
+  const ports = bl.formFactor === 'Mini-ITX' ? [22, 44, 66, 92, 116] : [26, 50, 74, 100, 126, 150];
+  for (const v of ports) box(group, 16, 16, 14, M.steel, 5, -v, 9);
+  // Audio capacitors and the codec, in the corner below the slots
+  if (bl.formFactor !== 'Mini-ITX') {
+    for (let i = 0; i < 5; i++) cyl(group, 3, 8, M.gold, 'z', 12 + i * 8, -(h - 22), 4, true);
+    box(group, 9, 9, 1.4, M.chip, 20, -(h - 38), 0.7);
   }
   // Chokes along the top of the socket, and down its side where there is room
   for (let i = 0; i < 6; i++) box(group, 8, 8, 7, M.slotAlt, socket.u - 26 + i * 10.4, -(socket.v - 52), 3.5);
@@ -36,6 +58,10 @@ export function buildBoard(part: MotherboardPart, lay: CaseLayout, bl: BoardLayo
   const frameH = pkg.h + 22;
   box(group, pkg.w + 10, pkg.h + 10, 3.5, M.slot, socket.u, -socket.v, 1.75);
   box(group, pkg.w - 2, pkg.h - 2, 0.5, M.gold, socket.u, -socket.v, 3.6);
+  // The four bolts that hold the socket's frame to the plate behind the board
+  for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    cyl(group, 2.6, 2, M.screw, 'z', socket.u + sx * (pkg.w / 2 + 9), -socket.v + sy * (pkg.h / 2 + 13), 1, true);
+  }
   const frame = new Group();
   frame.position.set(socket.u, -(socket.v - frameH / 2), 6.9);
   box(frame, frameW, 5, 1.2, M.steel, 0, -2.5, 0);
@@ -77,12 +103,20 @@ export function buildBoard(part: MotherboardPart, lay: CaseLayout, bl: BoardLayo
   for (let u = 24; u < w - 70; u += 34) {
     if (Math.abs(u - bl.frontHeader.u) > 30) box(group, 22, 5, 8, M.slot, u, -(h - 6), 4);
   }
+  // Pins standing in the fan and front-panel headers
+  copies(group, 12, M.gold, (dummy, i) => {
+    const header = i < 4 ? bl.fanHeader : bl.frontHeader;
+    const start = i < 4 ? -3.9 : -9 - 4 * 2.6;
+    dummy.position.set(header.u + start + i * 2.6, -header.v, 8.6);
+    dummy.scale.set(0.7, 0.7, 2.4);
+  });
 
-  // M.2 connectors, each with its standoff post
+  // M.2 connectors, each with its standoff post and the outline of the drive printed on the board
   bl.m2.slice(0, part.m2Slots.length).forEach((spot, i) => {
     box(group, 4, 22, 4.6, M.slot, spot.u - 2, -spot.v, 2.3);
     const reach = Math.min(part.m2Slots[i].maxLength, 80);
-    cyl(group, 2.4, bl.m2z, M.brass, 'z', spot.u + reach - 2, -spot.v, bl.m2z / 2, true);
+    cyl(group, 2.4, bl.m2z, M.brass, 'z', spot.u + reach, -spot.v, bl.m2z / 2, true);
+    box(group, reach - 4, 22, 0.25, M.slotAlt, spot.u + reach / 2, -spot.v, 0.12);
   });
 
   // Expansion slots, with a latch on the one the graphics card uses
@@ -90,6 +124,9 @@ export function buildBoard(part: MotherboardPart, lay: CaseLayout, bl: BoardLayo
   pcie.rows.forEach((row, i) => {
     const len = row.x16 ? pcie.len : 25;
     box(group, len, 7.5, pcie.height, i === 0 ? M.steel : M.slot, row.u + len / 2, -row.v, pcie.height / 2);
+    // The slit the card's edge goes into, with the key that splits it
+    if (i > 0) box(group, len - 4, 2.2, 0.6, M.chip, row.u + len / 2, -row.v, pcie.height + 0.1);
+    if (row.x16) box(group, 1.6, 7.5, pcie.height + 0.8, M.slotAlt, row.u + 13, -row.v, pcie.height / 2 + 0.4);
     if (i === 0) {
       box(group, len - 4, 2.2, 0.6, M.slot, row.u + len / 2, -row.v, pcie.height + 0.1);
       latch.position.set(row.u + len + 1, -row.v, 2);
