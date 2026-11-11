@@ -469,13 +469,12 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   function onStoreChange(change: Change): void {
     setPower(false);
-    if (change.kind === 'case') {
+    // A new case, or a build loaded afresh: draw everything again from the data.
+    if (change.kind === 'case' || change.kind === 'reset') {
       swapCase();
       return;
     }
-    if (change.kind === 'reset') {
-      s = store.cursor;
-    } else if (change.kind === 'install' && change.step && change.index !== undefined) {
+    if (change.kind === 'install' && change.step && change.index !== undefined) {
       ensure(change.step);
       const start = loose.get(change.step.id)?.p ?? 0;
       loose.delete(change.step.id);

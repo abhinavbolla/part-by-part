@@ -107,17 +107,17 @@ mouse events.
 
 | | This machine | 4x slower CPU, Fast 4G |
 |---|---|---|
-| Home: first paint | 40 ms | 268 ms |
-| Home: first 3D frame | 71 ms | 629 ms |
-| A part's page opened directly: first paint | 40 ms | 268 ms |
-| Category page swap (median / worst) | 16.5 / 18.7 ms | 19.2 / 103.2 ms |
-| Part page swap, link not hovered first | 21.1 ms | 214.4 ms |
-| Click to first animation frame (median / worst) | 11.9 / 13.4 ms | 15.6 / 18.9 ms |
-| Late frames while building (60 fps) | 0 of 918 | 0 of 918 |
+| Home: first paint | 32 ms | 252 ms |
+| Home: first 3D frame | 74 ms | 662 ms |
+| A part's page opened directly: first paint | 36 ms | 252 ms |
+| Category page swap (median / worst) | 17.5 / 31 ms | 18.3 / 106 ms |
+| Part page swap, link not hovered first | 25.7 ms | 202.6 ms |
+| Click to first animation frame (median / worst) | 8.9 / 17.4 ms | 17.5 / 21.9 ms |
+| Late frames while building (60 fps) | 0 of 1030 | 0 of 1030 |
 | Frames drawn while idle | 0 | 0 |
-| Transferred on first load | 143 KB, 3 requests | 143 KB, 3 requests |
+| Transferred on first load | 147 KB, 4 requests | 147 KB, 4 requests |
 
-One frame of a fully built machine costs 8.9 ms as a line drawing and 11.6 ms
+One frame of a fully built machine costs 6.1 ms as a line drawing and 7.5 ms
 shaded (CPU and GPU together, at 2880 x 1800, timed by forcing the GPU to
 finish). The script reports when the display is capped by power saving, since
 no page can be shown to be smoother than the browser's own frame interval.
@@ -130,6 +130,9 @@ Chrome has been run.
 
 Specs in `src/catalog/data` were entered by hand from each manufacturer's own
 product page on 11 November 2026, and every part records the page it came from.
+Cases, coolers and memory also carry a `look` entry, read from the same pages'
+text and photos: what the front panel is, how many heat pipes, the shape of a
+heat spreader's top. It is used only to draw them.
 Where a maker does not print a value it is marked in the data file: for example
 AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model

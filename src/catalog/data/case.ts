@@ -1,5 +1,7 @@
 import type { CasePart } from '../types.ts';
 
+// `look` records what each case looks like on its maker's page (read 2026-11-11):
+// the kind of front and top panel, where the ports are, what it stands on.
 export const CASES: CasePart[] = [
   {
     id: 'fractal-north-tg', category: 'case', brand: 'Fractal Design', name: 'North', sku: 'FD-C-NOR1C-02',
@@ -16,6 +18,7 @@ export const CASES: CasePart[] = [
     includedFans: { front: [140, 140], top: [], rear: [] },
     radiators: { front: [120, 140, 240, 280, 360], top: [120, 240], rear: [120] },
     bays: { ssd25: 2, hdd35: 2 },
+    look: { front: 'slats', slats: 10, top: 'mesh', frontIo: 'top-front', ports: { usbA: 2, usbC: 1, audio: 2 }, feet: 'pads', shroud: 'full' },
   },
   {
     id: 'corsair-4000d-airflow', category: 'case', brand: 'Corsair', name: '4000D Airflow', sku: 'CC-9011200-WW',
@@ -29,6 +32,7 @@ export const CASES: CasePart[] = [
     // Top sizes are from Corsair's own comparison article, not the spec table.
     radiators: { front: [240, 280, 360], top: [240, 280], rear: [120] },
     bays: { ssd25: 2, hdd35: 2 },
+    look: { front: 'mesh', slats: 0, top: 'mesh', frontIo: 'top-front', ports: { usbA: 1, usbC: 1, audio: 1 }, feet: 'pads', shroud: 'full' },
   },
   {
     id: 'nzxt-h5-flow-2024', category: 'case', brand: 'NZXT', name: 'H5 Flow', sku: 'CC-H52FB-01',
@@ -40,6 +44,7 @@ export const CASES: CasePart[] = [
     includedFans: { front: [120], top: [], rear: [120] },
     radiators: { front: [120, 140, 240, 280, 360], top: [240], rear: [] },
     bays: { ssd25: 2, hdd35: 1 },
+    look: { front: 'mesh', slats: 0, top: 'mesh', frontIo: 'top-front', ports: { usbA: 1, usbC: 1, audio: 1 }, feet: 'bars', shroud: 'vented' },
   },
   {
     id: 'lian-li-lancool-216', category: 'case', brand: 'Lian Li', name: 'Lancool 216', sku: 'LANCOOL 216RX',
@@ -51,5 +56,6 @@ export const CASES: CasePart[] = [
     includedFans: { front: [160, 160], top: [], rear: [140] },
     radiators: { front: [240, 280, 360], top: [240, 280, 360], rear: [] },
     bays: { ssd25: 4, hdd35: 2 },
+    look: { front: 'mesh', slats: 0, top: 'mesh', frontIo: 'top-front', ports: { usbA: 2, usbC: 1, audio: 1 }, feet: 'pads', shroud: 'vented' },
   },
 ];

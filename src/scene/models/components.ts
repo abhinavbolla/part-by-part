@@ -308,6 +308,13 @@ function spreaderOutline(length: number, bottom: number, top: number, style: Non
   if (style === 'angled') {
     return [[-half, bottom], [half, bottom], [half, top - 11], [half - 20, top], [-half + 34, top], [-half, top - 5]];
   }
+  if (style === 'peaked') {
+    // Low ends, sloped shoulders, a raised flat middle.
+    return [
+      [-half, bottom], [half, bottom], [half, top - 9], [half - 12, top - 9], [half - 34, top],
+      [-half + 34, top], [-half + 12, top - 9], [-half, top - 9],
+    ];
+  }
   if (style === 'fins') {
     // A comb of teeth along the top edge.
     const points: [number, number][] = [[-half, bottom], [half, bottom], [half, top - 6]];

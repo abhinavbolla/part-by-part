@@ -126,7 +126,7 @@ export interface RamPart extends Base {
   speed: number;
   height: number;
   /** The top edge of its heat spreader, as seen on the maker's page. Used only to draw it. */
-  look?: { top: 'flat' | 'lightbar' | 'fins' | 'angled' };
+  look?: { top: 'flat' | 'lightbar' | 'fins' | 'angled' | 'peaked' };
 }
 
 export interface StoragePart extends Base {

@@ -41,6 +41,24 @@ try {
 }
 remember([store.pcCase, ...store.steps.filter((step): step is Exclude<Step, { category: 'cable' }> => !isCable(step))]);
 
+/**
+ * A saved build carries its parts as they were when it was saved. Once the
+ * catalog arrives, swap in the current data, so a part that has since gained
+ * detail is drawn with it.
+ */
+function refreshSaved(): void {
+  const saved = store.save();
+  const categories = new Set<Category>(['case']);
+  for (const step of saved.steps) if (!isCable(step)) categories.add(step.category);
+  void Promise.all([...categories].map((category) => loadCategory(category))).then(() => {
+    const pcCase = peek(saved.case.id);
+    const steps = saved.steps.map((step) => (isCable(step) ? step : (peek(step.id) as Step | undefined) ?? step));
+    const fresh = { ...saved, case: pcCase && pcCase.category === 'case' ? pcCase : saved.case, steps };
+    if (JSON.stringify(fresh) !== JSON.stringify(saved)) store.restore(fresh);
+  }).catch(() => undefined);
+}
+refreshSaved();
+
 let scene: SceneApi | null = null;
 let powered = false;
 let scrubbing = false;
