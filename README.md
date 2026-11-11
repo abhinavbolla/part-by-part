@@ -35,8 +35,14 @@ come together.
   radiator mounts, M.2 slot count, length and SATA support, drive mounts, power
   supply size, connectors and wattage, and a display output.
 - **Two looks:** the build is drawn as an isometric line drawing by default,
-  and a switch on the timeline shows it shaded instead. Every part in the
-  catalog gets its own small drawing, made in the browser from the same model.
+  and a switch on the timeline shows it shaded instead. Lines rest light; the
+  part under the pointer, or the one going in, is drawn dark and named, and a
+  click on it opens its page. Every part in the catalog gets its own small
+  drawing, made in the browser from the same model.
+- **Parts drawn from what they are:** processor lids differ by socket, coolers
+  show their heat pipes and covers, memory shows its heat-spreader outline,
+  graphics cards their fins, backplate and bracket, and each case its own
+  front, top, ports and feet.
 - **Your build is kept** in the browser and comes back after a reload.
 - **Power on** once it is complete and wired: fans spin, lights come on.
 
@@ -59,8 +65,9 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
 ## How it is built
 
 - **No model files.** Every part is generated in code from its catalog
-  dimensions (`src/scene/models`). Parts are the right size and shape for their
-  specs; they carry no logos and do not copy any product's styling.
+  dimensions and a few recorded features (`src/scene/models`). Parts are the
+  right size and carry their real structure; they carry no logos and are not
+  exact replicas of any product.
 - **One number per step.** Seating a part or plugging a cable is a progress
   value from 0 to 1 and every pose is a pure function of it
   (`src/scene/anim.ts`). Undo, replay and scrubbing are the same mechanism.
@@ -81,7 +88,7 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
   that always faces the screen at a fixed width and fades over its last pixel,
   so lines stay smooth and stay put while the view turns. Each edge knows the
   two faces it joins; per frame it is an outline (one face toward you, one
-  away: dark), a crease (both toward you: light) or hidden. Curved shapes get
+  away), a crease (both toward you, drawn fainter) or hidden. Curved shapes get
   their outline wherever it falls (`src/scene/edges.ts`). The style takes its
   cue from [hairline](https://github.com/lucasmarkes/hairline) by Lucas Markes;
   none of its code is used.
