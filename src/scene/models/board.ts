@@ -4,13 +4,84 @@
 
 import { Group, type Object3D } from 'three';
 
-import type { MotherboardPart } from '../../catalog/types.ts';
+import type { MotherboardPart, RearPort } from '../../catalog/types.ts';
 import { driveScrew, easeInOut, seg, travel, type Travel } from '../anim.ts';
 import { packageSize, type BoardLayout, type CaseLayout } from '../layout.ts';
 import { M, box, copies, cyl, glowMat, rbox, screw } from '../kit.ts';
 import type { Fixtures, PartModel } from './types.ts';
 
 export interface BoardModel extends PartModel, Fixtures {}
+
+const USUAL_PORTS: RearPort[][] = [
+  ['dp', 'hdmi'], ['usbA', 'usbA'], ['usbA', 'usbA'], ['lan', 'usbA', 'usbA'], ['usbC'],
+  ['antenna'], ['antenna'], ['audio', 'audio', 'audio'],
+];
+
+/** Each port's size on the panel: along it, and up from the board. */
+const PORT: Record<RearPort, [number, number]> = {
+  usbA: [14.5, 7.2], usbC: [10, 4.4], hdmi: [15.5, 6.6], dp: [17, 6.2], lan: [16.5, 13.5],
+  audio: [11, 10.4], optical: [11, 10.4], antenna: [12, 11], button: [9, 8], ps2: [14, 13], vent: [14, 30],
+};
+
+/**
+ * The port block: a shield that fills the case's opening, and every port the
+ * board has, column by column as on the real panel.
+ */
+function rearPorts(group: Group, part: MotherboardPart): void {
+  const columns = part.rearIo ?? USUAL_PORTS;
+  const [top, bottom] = [9, 157];
+  const face = -11.6; // inside the thickness of the case's rear panel
+  box(group, 0.8, 152, 43, M.heatsinkDark, -10.6, -83, 20.5);
+
+  const widths = columns.map((column) => Math.max(...column.map((port) => PORT[port][0])));
+  const gap = 2.5;
+  const needed = widths.reduce((sum, wide) => sum + wide + gap, -gap);
+  const squeeze = Math.min(1, (bottom - top) / needed);
+  const spare = (bottom - top - needed * squeeze) / (columns.length + 1);
+
+  let v = top + spare;
+  columns.forEach((column, c) => {
+    const across = widths[c] * squeeze;
+    const centre = v + across / 2;
+    const tall = column.reduce((sum, port) => sum + PORT[port][1] + 1.2, -1.2);
+    const fit = Math.min(1, 37 / tall);
+    // The housing the ports of this column share, standing on the board
+    if (!column.every((port) => port === 'antenna' || port === 'button' || port === 'vent')) {
+      box(group, 22, across, tall * fit + 1, M.steel, 1.4, -centre, 2 + (tall * fit + 1) / 2);
+    }
+    let z = 2.5 + tall * fit;
+    for (const port of column) {
+      const [wide, high] = [PORT[port][0] * squeeze, PORT[port][1] * fit];
+      const mid = z - high / 2;
+      z -= high + 1.2 * fit;
+      if (port === 'audio') {
+        cyl(group, 4.4, 2.4, M.slotAlt, 'x', face, -centre, mid, true);
+        cyl(group, 1.8, 2.8, M.slot, 'x', face, -centre, mid, true);
+      } else if (port === 'antenna') {
+        cyl(group, 4.8, 1.6, M.gold, 'x', face + 0.4, -centre, 26, true);
+        cyl(group, 3.1, 9, M.gold, 'x', face - 3, -centre, 26, true);
+      } else if (port === 'button') {
+        rbox(group, 2.4, Math.min(wide, 6.5), 6.5 * fit, 0.8, M.slotAlt, face, -centre, mid);
+      } else if (port === 'ps2') {
+        cyl(group, 6.4, 2.4, M.slotAlt, 'x', face, -centre, mid, true);
+        cyl(group, 4.8, 2.8, M.slot, 'x', face, -centre, mid, true);
+      } else if (port === 'optical') {
+        box(group, 2.4, 9 * squeeze, 9 * fit, M.slotAlt, face, -centre, mid);
+        box(group, 2.8, 5, 5, M.slot, face, -centre, mid);
+      } else if (port === 'vent') {
+        for (let i = 0; i < 5; i++) box(group, 1.2, wide - 4, 2.6, M.vent, face + 0.6, -centre, 8 + i * 6);
+      } else {
+        // A steel rim round a dark mouth; USB-A carries a tongue, the network port its latch notch
+        const [mouthW, mouthH] = [wide - 2.2, high - 2];
+        box(group, 2.4, wide - 0.8, high - 0.6, M.steel, face, -centre, mid);
+        box(group, 2.8, mouthW, mouthH, M.slot, face, -centre, mid);
+        if (port === 'usbA') box(group, 3, mouthW - 2, 1.5, M.slotAlt, face, -centre, mid - 0.9);
+        if (port === 'lan') box(group, 3, 5 * squeeze, 2.2, M.slot, face, -centre, mid - high / 2 + 0.6);
+      }
+    }
+    v += across + gap * squeeze + spare;
+  });
+}
 
 export function buildBoard(part: MotherboardPart, lay: CaseLayout, bl: BoardLayout): BoardModel {
   const group = new Group();
@@ -38,9 +109,7 @@ export function buildBoard(part: MotherboardPart, lay: CaseLayout, bl: BoardLayo
     });
   }
 
-  // Rear ports standing proud of the board's edge, under the shroud
-  const ports = bl.formFactor === 'Mini-ITX' ? [22, 44, 66, 92, 116] : [26, 50, 74, 100, 126, 150];
-  for (const v of ports) box(group, 16, 16, 14, M.steel, 5, -v, 9);
+  rearPorts(group, part);
   // Audio capacitors and the codec, in the corner below the slots
   if (bl.formFactor !== 'Mini-ITX') {
     for (let i = 0; i < 5; i++) cyl(group, 3, 8, M.gold, 'z', 12 + i * 8, -(h - 22), 4, true);

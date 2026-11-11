@@ -39,7 +39,7 @@ import { radiatorMount, slotsFrom, storageMounts, type Slots, type StorageMount 
 import { HOVER, clamp01, easeOut, seg } from './anim.ts';
 import { lineMaterial, outline, releaseLineMaterial, setEdgeView, setEdgesVisible } from './edges.ts';
 import { M, disposeModel, glowMat, setGlow, setLook, shadows, tube, type Look } from './kit.ts';
-import { boardLayout, caseLayout, type BoardLayout } from './layout.ts';
+import { GPU_ROW, SLOT_PITCH, boardLayout, caseLayout, type BoardLayout } from './layout.ts';
 import { buildBoard, type BoardModel } from './models/board.ts';
 import { buildCable } from './models/cables.ts';
 import { buildCase } from './models/case.ts';
@@ -157,6 +157,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   // ---- step models ---------------------------------------------------------
 
   const models = new Map<string, PartModel>();
+  const cardSlots = new Map<string, { first: number; rows: number }>();
   const signatures = new Map<string, string>();
   const lastP = new Map<string, number>();
   const ghostBoxes = new Map<string, Box3[]>();
@@ -225,7 +226,13 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
         const mount = mountOf(step);
         return mount.kind === 'm2' ? buildM2(step, bl, mount.index) : buildDrive25(step, lay, mount.index);
       }
-      case 'gpu': return buildGpu(step, bl, fixtures);
+      case 'gpu':
+        // Which of the case's slot covers this card takes the place of
+        cardSlots.set(step.id, {
+          first: Math.round((bl.pcie.rows[0].v - GPU_ROW) / SLOT_PITCH) + 1,
+          rows: Math.ceil(step.slots),
+        });
+        return buildGpu(step, bl, fixtures);
       case 'psu': return buildPsu(step, lay);
       case 'cable':
         return buildCable(step, { lay, bl, slots: allSlots(), mounts: new Map(store.mounts) });
@@ -242,6 +249,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     if (lines) releaseLineMaterial(lines);
     linesOf.delete(id);
     models.delete(id);
+    cardSlots.delete(id);
     signatures.delete(id);
     ghostBoxes.delete(id);
     centers.delete(id);
@@ -426,7 +434,8 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   }
 
   function orbit(dx: number, dy: number): void {
-    viewTarget.az = Math.max(-1.25, Math.min(1.25, viewTarget.az - dx * 0.006));
+    // All the way round: the back of the machine is part of the drawing.
+    viewTarget.az -= dx * 0.006;
     viewTarget.el = Math.max(0.05, Math.min(1.2, viewTarget.el + dy * 0.005));
     invalidate();
   }
@@ -768,6 +777,10 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       onProgress?.(s);
     }
     if (stepLoose(dt)) active = true;
+    // The slot covers come out as a graphics card starts down toward its slot.
+    let open = { first: 0, rows: 0 };
+    for (const [id, slots] of cardSlots) if ((lastP.get(id) ?? 0) > 0.3) open = slots;
+    caseModel.openSlots(open.first, open.rows);
     if (applyPower(dt)) active = true;
     if (stepEmphasis(dt)) active = true;
 

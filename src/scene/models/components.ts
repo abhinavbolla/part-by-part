@@ -495,10 +495,25 @@ export function buildGpu(part: GpuPart, bl: BoardLayout, fx: Fixtures): PartMode
   // The rear bracket: one slot width per row, vented, with its tab folded over the case
   const rows = Math.ceil(part.slots);
   const bracketH = rows * 20.32 - 2;
-  box(group, 1.5, bracketH, 118, M.steel, x0 + 0.75, 10 - bracketH / 2, 56);
-  box(group, 12, bracketH, 1.5, M.steel, x0 + 6, 10 - bracketH / 2, 115.5);
-  for (let i = 0; i < rows; i++) {
-    for (const z of [40, 62, 84]) box(group, 0.5, 11, 16, M.vent, x0 + 1.75, 4 - i * 20.32, z);
+  box(group, 1.5, bracketH, 118, M.steel, x0 + 0.75, 6 - bracketH / 2, 56);
+  box(group, 12, bracketH, 1.5, M.steel, x0 + 6, 6 - bracketH / 2, 115.5);
+  // The row over the slot carries the display outputs, seen from behind the
+  // case; any rows beyond it are vented.
+  const outputs = part.outputs ?? { dp: 3, hdmi: 1 };
+  const sockets: ('dp' | 'hdmi')[] = [...Array(outputs.hdmi).fill('hdmi'), ...Array(outputs.dp).fill('dp')];
+  const outPitch = Math.min(22, 92 / Math.max(1, sockets.length));
+  sockets.forEach((kind, i) => {
+    const z = 100 - outPitch * (i + 0.5);
+    const [wide, tall] = kind === 'dp' ? [16, 4.8] : [14.4, 5.2];
+    box(group, 12, tall + 2.4, wide + 2.4, M.steel, x0 + 5, -5, z);
+    box(group, 1.2, tall + 1.6, wide + 1.6, M.steel, x0 - 0.5, -5, z);
+    box(group, 1.6, tall, wide, M.slot, x0 - 0.6, -5, z);
+  });
+  for (let i = 1; i < rows; i++) {
+    for (const z of [26, 48, 70, 92]) {
+      box(group, 0.5, 11, 16, M.vent, x0 + 1.75, -4 - i * 20.32, z);
+      box(group, 0.5, 11, 16, M.vent, x0 - 0.25, -4 - i * 20.32, z);
+    }
   }
 
   // Fans on the face that looks down, each in a ring let into the shroud
@@ -566,8 +581,44 @@ export function buildPsu(part: PsuPart, lay: CaseLayout): PartModel {
       }
     }
   }
+  // The face at the back of the case: mains inlet, rocker switch, exhaust
+  // grille and the four screws that hold it to the panel
+  const rear = part.look ?? { switch: true, grille: 'hex' as const, fan: 120 };
+  const inletZ = width * 0.8;
+  box(group, 0.8, 22, 30, M.slotAlt, -0.3, height * 0.34, inletZ);
+  box(group, 1, 17, 24, M.slot, -0.5, height * 0.34, inletZ);
+  for (const dz of [-7, 0, 7]) box(group, 1.6, 7, 2, M.steel, -0.4, height * 0.34 + (dz ? -1.5 : 3), inletZ + dz);
+  if (rear.switch) {
+    box(group, 0.8, 16, 22, M.slotAlt, -0.3, height * 0.72, inletZ);
+    const rocker = box(group, 2.4, 11, 17, M.black, -0.9, height * 0.72, inletZ);
+    rocker.rotation.y = 0.12;
+  }
+  if (rear.grille !== 'none') {
+    const [spanZ, spanY] = [width * 0.56, height - 22];
+    if (rear.grille !== 'slots') {
+      const tri = rear.grille === 'tri';
+      const [pz, py] = tri ? [8.4, 7.4] : [9, 7.8];
+      const [cols, rowsY] = [Math.floor(spanZ / pz), Math.floor(spanY / py)];
+      copies(group, cols * rowsY, M.vent, (dummy, i) => {
+        const [col, row] = [i % cols, Math.floor(i / cols)];
+        dummy.position.set(-0.2, 11 + py * (row + 0.5), width * 0.06 + pz * (col + (tri ? 0.5 : row % 2 ? 0.75 : 0.25)));
+        dummy.rotation.set(tri ? ((col + row) % 2 ? Math.PI / 2 : -Math.PI / 2) : 0, 0, Math.PI / 2);
+        dummy.scale.set(tri ? 8 : 7, 0.5, tri ? 8 : 7);
+      }, tri ? 'tri' : 'hex');
+    } else {
+      const rowsY = Math.floor(spanY / 7);
+      copies(group, rowsY, M.vent, (dummy, i) => {
+        dummy.position.set(-0.2, 11 + 7 * (i + 0.5), width * 0.06 + spanZ / 2);
+        dummy.scale.set(0.5, 3.2, spanZ);
+      });
+    }
+  }
+  for (const [fz, fy] of [[0.05, 0.08], [0.95, 0.08], [0.05, 0.92], [0.95, 0.92]]) {
+    cyl(group, 2.6, 1.4, M.screw, 'x', -0.6, height * fy, width * fz, true);
+  }
+
   // The fan grille on top: rings, spokes and a hub
-  const grille = Math.min(len, width) * 0.44;
+  const grille = Math.min(rear.fan / 2 + 2, Math.min(len, width) / 2 - 4);
   for (const radius of [1, 0.74, 0.48]) {
     const loop = ring(group, grille * radius, grille * radius - 2.2, 1, M.heatsinkDark, len / 2, height + 1, width / 2);
     loop.rotation.x = -Math.PI / 2;

@@ -1,7 +1,9 @@
 import type { CasePart } from '../types.ts';
 
-// `look` records what each case looks like on its maker's page (read 2026-11-11):
-// the kind of front and top panel, where the ports are, what it stands on.
+// `look` records what each case looks like in its maker's photos (studied
+// 2026-11-11): its panels and their perforation, the closed front section, the
+// button and ports, feet, the rear panel and what is inside. Lengths taken from
+// photos are estimates by proportion.
 export const CASES: CasePart[] = [
   {
     id: 'fractal-north-tg', category: 'case', brand: 'Fractal Design', name: 'North', sku: 'FD-C-NOR1C-02',
@@ -18,7 +20,11 @@ export const CASES: CasePart[] = [
     includedFans: { front: [140, 140], top: [], rear: [] },
     radiators: { front: [120, 140, 240, 280, 360], top: [120, 240], rear: [120] },
     bays: { ssd25: 2, hdd35: 2 },
-    look: { front: 'slats', slats: 10, top: 'mesh', frontIo: 'top-front', ports: { usbA: 2, usbC: 1, audio: 2 }, feet: 'pads', shroud: 'full' },
+    look: {
+      front: 'slats', slats: 10, holes: 'slits', frontDepth: 100, frontGap: 0, top: 'mesh', topSolidFront: 100,
+      ioAt: 'near', ports: { usbA: 2, usbC: 1, audio: 2 }, reset: false, powerRound: true, feet: 'rounds',
+      shroud: 'full', rearFan: 120, rearGrille: 'slots', rearVented: true, cableBar: false, pullTab: true,
+    },
   },
   {
     id: 'corsair-4000d-airflow', category: 'case', brand: 'Corsair', name: '4000D Airflow', sku: 'CC-9011200-WW',
@@ -32,7 +38,11 @@ export const CASES: CasePart[] = [
     // Top sizes are from Corsair's own comparison article, not the spec table.
     radiators: { front: [240, 280, 360], top: [240, 280], rear: [120] },
     bays: { ssd25: 2, hdd35: 2 },
-    look: { front: 'mesh', slats: 0, top: 'mesh', frontIo: 'top-front', ports: { usbA: 1, usbC: 1, audio: 1 }, feet: 'pads', shroud: 'full' },
+    look: {
+      front: 'mesh', slats: 0, holes: 'triangles', frontDepth: 34, frontGap: 9, top: 'mesh', topSolidFront: 44,
+      ioAt: 'centre', ports: { usbA: 1, usbC: 1, audio: 1 }, reset: true, powerRound: false, feet: 'wedges',
+      shroud: 'full', rearFan: 120, rearGrille: 'hex', rearVented: false, cableBar: true, pullTab: false,
+    },
   },
   {
     id: 'nzxt-h5-flow-2024', category: 'case', brand: 'NZXT', name: 'H5 Flow', sku: 'CC-H52FB-01',
@@ -44,7 +54,11 @@ export const CASES: CasePart[] = [
     includedFans: { front: [120], top: [], rear: [120] },
     radiators: { front: [120, 140, 240, 280, 360], top: [240], rear: [] },
     bays: { ssd25: 2, hdd35: 1 },
-    look: { front: 'mesh', slats: 0, top: 'mesh', frontIo: 'top-front', ports: { usbA: 1, usbC: 1, audio: 1 }, feet: 'bars', shroud: 'vented' },
+    look: {
+      front: 'mesh', slats: 0, holes: 'rounds', frontDepth: 30, frontGap: 0, top: 'mesh', topSolidFront: 0,
+      ioAt: 'far', ports: { usbA: 1, usbC: 1, audio: 1 }, reset: false, powerRound: true, feet: 'bars',
+      shroud: 'vented', rearFan: 120, rearGrille: 'hex', rearVented: true, cableBar: true, pullTab: false,
+    },
   },
   {
     id: 'lian-li-lancool-216', category: 'case', brand: 'Lian Li', name: 'Lancool 216', sku: 'LANCOOL 216RX',
@@ -56,6 +70,10 @@ export const CASES: CasePart[] = [
     includedFans: { front: [160, 160], top: [], rear: [140] },
     radiators: { front: [240, 280, 360], top: [240, 280, 360], rear: [] },
     bays: { ssd25: 4, hdd35: 2 },
-    look: { front: 'mesh', slats: 0, top: 'mesh', frontIo: 'top-front', ports: { usbA: 2, usbC: 1, audio: 1 }, feet: 'pads', shroud: 'vented' },
+    look: {
+      front: 'mesh', slats: 0, holes: 'fine', frontDepth: 30, frontGap: 0, top: 'mesh', topSolidFront: 30,
+      ioAt: 'near', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: true, powerRound: false, feet: 'pads',
+      shroud: 'vented', rearFan: 140, rearGrille: 'hex', rearVented: false, cableBar: false, pullTab: false,
+    },
   },
 ];
