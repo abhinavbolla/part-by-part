@@ -88,6 +88,15 @@ function shell(): Plugin {
       }
       for (const category of CATEGORY_ORDER) write(`data/${category}.json`, dataFor(category));
       write('data/index.json', JSON.stringify(searchIndex(CATALOG)));
+      // The minifier strips licence comments, so ship the notices as a file.
+      write('THIRD-PARTY-LICENSES.txt', [
+        'This site includes the following third-party software.',
+        '',
+        'three.js (https://threejs.org)',
+        '',
+        readFileSync('node_modules/three/LICENSE', 'utf8').trim(),
+        '',
+      ].join('\n'));
     },
   };
 }
