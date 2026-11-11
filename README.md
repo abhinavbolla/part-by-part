@@ -77,13 +77,14 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
   grows.
 - **Idle means idle.** The scene draws a frame only when something moves, and
   shaders and parts are prepared while the page is idle.
-- **The drawing comes from the picture, not from each shape.** The scene is
-  rendered once into flat plates, depth and surface normals; a second pass
-  draws a dark line where depth jumps (an outline) and a lighter one where a
-  surface turns (a crease). Any part, however it is modelled, is outlined the
-  same way (`src/scene/drawing.ts`). The style takes its cue from
-  [hairline](https://github.com/lucasmarkes/hairline) by Lucas Markes; none of
-  its code is used.
+- **The lines are real geometry.** Every edge of every shape is a thin strip
+  that always faces the screen at a fixed width and fades over its last pixel,
+  so lines stay smooth and stay put while the view turns. Each edge knows the
+  two faces it joins; per frame it is an outline (one face toward you, one
+  away: dark), a crease (both toward you: light) or hidden. Curved shapes get
+  their outline wherever it falls (`src/scene/edges.ts`). The style takes its
+  cue from [hairline](https://github.com/lucasmarkes/hairline) by Lucas Markes;
+  none of its code is used.
 - **Nothing shifts.** The box for a part's drawing is sized in the HTML before
   the drawing exists, so lists do not move when drawings arrive.
 
@@ -92,33 +93,31 @@ Dependencies: `three` at runtime; Vite, TypeScript and `playwright-core` (for
 
 ## Measured
 
-`npm run measure`, 11 November 2026 (evening, after the redesign), Apple M4,
-Chrome, production build served with Brotli. Medians of five cold loads;
-interaction figures from a scripted build of 14 steps driven with real mouse
-events. **The Mac was on battery in Low Power Mode for this run**, which makes
-everything somewhat slower than a plugged-in run and caps Chrome at 30 frames
-a second, so smoothness at 60 fps could not be shown this time.
+`npm run measure`, 11 November 2026 (after the redesign), Apple M4 on mains
+power, Chrome, production build served with Brotli. Medians of five cold
+loads; interaction figures from a scripted build of 14 steps driven with real
+mouse events.
 
 | | This machine | 4x slower CPU, Fast 4G |
 |---|---|---|
-| Home: first paint | 64 ms | 388 ms |
-| Home: first 3D frame | 114 ms | 1067 ms |
-| A part's page opened directly: first paint | 64 ms | 356 ms |
-| Category page swap (median / worst) | 17.7 / 34.8 ms | 61.6 / 155.5 ms |
-| Part page swap, link not hovered first | 20.8 ms | 231.9 ms |
-| Click to first animation frame (median / worst) | 14.5 / 32.9 ms | 28 / 50.9 ms |
-| Late frames while building (frame interval 33.3 ms) | 1 of 459 | 0 of 461 |
+| Home: first paint | 40 ms | 268 ms |
+| Home: first 3D frame | 71 ms | 629 ms |
+| A part's page opened directly: first paint | 40 ms | 268 ms |
+| Category page swap (median / worst) | 16.5 / 18.7 ms | 19.2 / 103.2 ms |
+| Part page swap, link not hovered first | 21.1 ms | 214.4 ms |
+| Click to first animation frame (median / worst) | 11.9 / 13.4 ms | 15.6 / 18.9 ms |
+| Late frames while building (60 fps) | 0 of 918 | 0 of 918 |
 | Frames drawn while idle | 0 | 0 |
-| Transferred on first load | 142 KB, 3 requests | 142 KB, 3 requests |
+| Transferred on first load | 143 KB, 3 requests | 143 KB, 3 requests |
 
-Cost of one frame of a fully built machine, CPU and GPU together, timed by
-forcing the GPU to finish: 11.2 ms for the line drawing and 11.3 ms shaded at
-2880 x 1800, also in Low Power Mode. Both fit a 16.7 ms frame.
+One frame of a fully built machine costs 8.9 ms as a line drawing and 11.6 ms
+shaded (CPU and GPU together, at 2880 x 1800, timed by forcing the GPU to
+finish). The script reports when the display is capped by power saving, since
+no page can be shown to be smoother than the browser's own frame interval.
 
-The previous run, plugged in and before the redesign, measured 0 of 918 frames
-over 20 ms at 60 fps. The throttled column slows the CPU and network only; the
-GPU is still this machine's. Nothing has been measured on a phone or a low-end
-laptop, and only Chrome has been run.
+The throttled column slows the CPU and network only; the GPU is still this
+machine's. Nothing has been measured on a phone or a low-end laptop, and only
+Chrome has been run.
 
 ## Parts data
 

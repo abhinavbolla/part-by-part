@@ -29,22 +29,18 @@ const accentColor = new Color(0xff5a1f);
 export { UNIT_BOX };
 
 /**
- * Makes a material also write its surface normal to a second output. The
- * line-drawing look reads plates and normals from one pass over the scene
- * instead of drawing everything twice; elsewhere the extra output is ignored.
+ * Faces sit a hair behind their true depth, so the lines drawn along their
+ * edges always win against the face they belong to.
  */
-function withNormalOutput(material: MeshStandardMaterial): MeshStandardMaterial {
-  material.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'layout(location = 1) out highp vec4 gNormal;\nvoid main() {')
-      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgNormal = vec4(normal * 0.5 + 0.5, 1.0);');
-  };
-  material.customProgramCacheKey = () => 'normal-output';
+function setBack(material: MeshStandardMaterial): MeshStandardMaterial {
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = 1;
+  material.polygonOffsetUnits = 2;
   return material;
 }
 
 export function mat(color: number, roughness = 0.6, metalness = 0): MeshStandardMaterial {
-  return withNormalOutput(new MeshStandardMaterial({ color, roughness, metalness }));
+  return setBack(new MeshStandardMaterial({ color, roughness, metalness }));
 }
 
 /** Shared palette. Parts that light up get their own material instead. */
@@ -252,7 +248,7 @@ export function fan(parent: Object3D, size: number, thickness: number, blades = 
 
 /** A material that can be lit when the machine is powered. */
 export function glowMat(color: number, emissive: number): MeshStandardMaterial {
-  const material = withNormalOutput(new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0, emissive }));
+  const material = setBack(new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0, emissive }));
   glows.set(material, color);
   setGlow(material, 0);
   return material;
@@ -280,6 +276,7 @@ export function tube(
   const segments = Math.max(14, points.length * 9);
   const mesh = new Mesh(new TubeGeometry(curve, segments, radius, RADIAL, false), material);
   mesh.userData.own = true;
+  mesh.userData.noLines = true; // a cable is a dark stroke already
   mesh.userData.segments = segments;
   parent.add(mesh);
   return mesh;

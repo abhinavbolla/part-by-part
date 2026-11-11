@@ -156,7 +156,7 @@ function drawPictures(): void {
     const id = card.dataset.id!;
     if (card.classList.contains('detail')) {
       const item = peek(id);
-      const url = figures.get(id) ?? (item && scene?.thumbnail(item, 660, 528));
+      const url = figures.get(id) ?? (item && scene?.thumbnail(item, 660, 528, 2));
       if (!url) continue;
       figures.set(id, url);
       fill(card.querySelector('.figure'), url);
@@ -174,7 +174,7 @@ function drawPictures(): void {
     const item = card && (peek(card.dataset.id!) ?? (card.dataset.id === store.pcCase.id ? store.pcCase : undefined));
     // Wait for a quiet moment: a picture takes a few milliseconds of the main thread.
     if (item && scene?.stats.settled) {
-      const url = scene.thumbnail(item, 168, 132);
+      const url = scene.thumbnail(item, 168, 132, 3);
       if (url) pictures.set(item.id, url);
     }
     drawPictures();

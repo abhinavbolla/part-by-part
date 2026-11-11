@@ -36,7 +36,7 @@ import type { BuildStore, Change } from '../build/store.ts';
 import type { CatalogItem, MotherboardPart, Step, StoragePart } from '../catalog/types.ts';
 import { radiatorMount, slotsFrom, storageMounts, type Slots, type StorageMount } from '../rules/compat.ts';
 import { HOVER, clamp01, easeOut, seg } from './anim.ts';
-import { createDrawing, type Drawing } from './drawing.ts';
+import { outline, setEdgeView, setEdgesVisible } from './edges.ts';
 import { M, disposeModel, glowMat, setGlow, setLook, shadows, tube, type Look } from './kit.ts';
 import { boardLayout, caseLayout, type BoardLayout } from './layout.ts';
 import { buildBoard, type BoardModel } from './models/board.ts';
@@ -105,9 +105,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   const paper = new Color(BG);
   renderer.info.autoReset = false;
 
-  // Two looks. The drawing is flat plates under even light, outlined in a
-  // second pass; the shaded one is lit, with shadows and reflections.
-  const drawing = createDrawing(renderer, BG);
+  // Two looks. The drawing is flat plates under even light with every edge
+  // drawn as a line; the shaded one is lit, with shadows and reflections.
+  scene.background = paper;
   const ambient = new AmbientLight(0xffffff, Math.PI);
   const hemisphere = new HemisphereLight(0xffffff, 0xd4d4d8, 0.75);
   const sun = new DirectionalLight(0xffffff, 3.1);
@@ -143,6 +143,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     lay = caseLayout(store.pcCase);
     caseModel = buildCase(store.pcCase, lay);
     shadows(caseModel.group);
+    outline(caseModel.group);
     scene.add(caseModel.group);
     boardFrame = new Group();
     boardFrame.position.set(lay.board.x, lay.board.y, lay.board.z);
@@ -243,6 +244,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
     const model = build(step);
     shadows(model.group);
+    outline(model.group);
     (model.frame === 'board' ? boardFrame : caseModel.group).add(model.group);
     models.set(step.id, model);
     signatures.set(step.id, wanted);
@@ -275,7 +277,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   // ---- drop-target ghost ---------------------------------------------------
 
-  /** Drop targets live on their own layer so the drawing pass can lay them over the lines. */
+  /** Drop targets live on their own layer, so a part can be pictured without them. */
   const OVERLAY = 1;
   const ghost = new Group();
   scene.add(ghost);
@@ -321,16 +323,14 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   // ---- camera --------------------------------------------------------------
 
-  // An orthographic camera: parallel lines stay parallel, as in a technical
-  // drawing, and depth is linear, which the outline pass relies on.
+  // An orthographic camera: parallel lines stay parallel, as in a technical drawing.
   const camera = new OrthographicCamera(-1, 1, 1, -1, 10, 9000);
+  camera.layers.enable(OVERLAY);
   const center = new Vector3(0, lay.H * 0.5, 0);
   const view = { az: 0.62, el: 0.4, zoom: 1 };
   const viewTarget = { ...view };
   /** Scene millimetres across the full height of the canvas at zoom 1. */
   let span = 1000;
-  /** Size of one device pixel in scene millimetres. */
-  let pixel = 1;
   let width = 1;
   let height = 1;
 
@@ -338,8 +338,6 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     width = canvas.clientWidth || window.innerWidth;
     height = canvas.clientHeight || window.innerHeight;
     renderer.setSize(width, height, false);
-    const buffer = renderer.getDrawingBufferSize(new Vector2());
-    drawing.setSize(buffer.x, buffer.y);
     const inset = insets();
     const freeW = Math.max(240, width - inset.left - inset.right);
     const freeH = Math.max(240, height - inset.top - inset.bottom);
@@ -373,7 +371,6 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     camera.right = (half * width) / height;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
-    pixel = (span * view.zoom) / height / renderer.getPixelRatio();
   }
 
   // ---- look ----------------------------------------------------------------
@@ -393,7 +390,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     hemisphere.visible = shaded;
     sun.visible = shaded;
     ground.visible = shaded;
-    scene.background = shaded ? paper : null;
+    setEdgesVisible(!shaded);
     if (shaded && !environment) {
       const pmrem = new PMREMGenerator(renderer);
       environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -401,27 +398,15 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     }
     scene.environment = shaded ? environment : null;
     scene.environmentIntensity = 0.6;
-    camera.layers.set(0);
-    if (shaded) camera.layers.enable(OVERLAY);
     invalidate();
   }
 
   /** Draws one frame in the current look. */
   function draw(): void {
     renderer.info.reset();
-    if (look === 'shaded') {
-      renderer.setRenderTarget(null);
-      renderer.render(scene, camera);
-      return;
-    }
-    drawing.render(scene, camera, camera.far - camera.near, pixel);
-    if (ghost.children.length) {
-      renderer.autoClear = false;
-      camera.layers.set(OVERLAY);
-      renderer.render(scene, camera);
-      camera.layers.set(0);
-      renderer.autoClear = true;
-    }
+    const buffer = renderer.getDrawingBufferSize(new Vector2());
+    setEdgeView(buffer.x, buffer.y, renderer.getPixelRatio());
+    renderer.render(scene, camera);
   }
 
   function orbit(dx: number, dy: number): void {
@@ -744,22 +729,23 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   // ---- pictures of single parts ---------------------------------------------
 
-  let studio: { drawing: Drawing; out: WebGLRenderTarget; camera: OrthographicCamera; canvas: HTMLCanvasElement } | null = null;
+  let studio: { out: WebGLRenderTarget; camera: OrthographicCamera; canvas: HTMLCanvasElement } | null = null;
   const REST = new Vector3(Math.sin(0.62) * Math.cos(0.4), Math.sin(0.4), Math.cos(0.62) * Math.cos(0.4));
 
-  /** Draws `target` alone, from the resting angle, and returns it as an image address. */
-  function picture(target: Object3D, w: number, h: number): string {
+  /**
+   * Draws `target` alone, from the resting angle, and returns it as an image
+   * address. `scale` is how many picture pixels make one pixel where it is shown.
+   */
+  function picture(target: Object3D, w: number, h: number, scale: number): string {
     studio ??= {
-      drawing: createDrawing(renderer, BG),
-      out: new WebGLRenderTarget(1, 1),
+      out: new WebGLRenderTarget(1, 1, { samples: 4 }),
       camera: new OrthographicCamera(-1, 1, 1, -1, 10, 9000),
       canvas: document.createElement('canvas'),
     };
-    const { drawing: solo, out, camera: eye, canvas: sheet } = studio;
+    const { out, camera: eye, canvas: sheet } = studio;
     out.texture.colorSpace = SRGBColorSpace;
     if (out.width !== w || out.height !== h) {
       out.setSize(w, h);
-      solo.setSize(w, h);
       sheet.width = w;
       sheet.height = h;
     }
@@ -793,7 +779,10 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
     target.traverse((node) => node.layers.set(SOLO));
     eye.layers.set(SOLO);
-    solo.render(scene, eye, eye.far - eye.near, (2 * half) / h, out);
+    setEdgeView(w, h, scale);
+    renderer.setRenderTarget(out);
+    renderer.render(scene, eye);
+    renderer.setRenderTarget(null);
     target.traverse((node) => node.layers.set(0));
 
     const pixels = new Uint8Array(w * h * 4);
@@ -811,12 +800,13 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
    * A line drawing of one catalog item on its own, or null when one cannot be
    * made right now (the shaded look is on, or something is being dragged).
    */
-  function thumbnail(item: CatalogItem | Step, w: number, h: number): string | null {
+  function thumbnail(item: CatalogItem | Step, w: number, h: number, scale: number): string | null {
     if (look !== 'drawing' || visitor || item.category === 'cable') return null;
     if (item.category === 'case') {
       const model = buildCase(item, caseLayout(item));
+      outline(model.group);
       scene.add(model.group);
-      const url = picture(model.group, w, h);
+      const url = picture(model.group, w, h, scale);
       disposeModel(model.group);
       return url;
     }
@@ -825,7 +815,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     model.group.visible = true;
     model.setProgress(1, false);
     model.group.scale.setScalar(1);
-    const url = picture(model.group, w, h);
+    const url = picture(model.group, w, h, scale);
     pose(item.id, was, false, true);
     return url;
   }
@@ -853,6 +843,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       tube(rig, [[0, 0, 0], [10, 10, 0], [20, 0, 0]], 2, M.cable);
       rig.add(new Mesh(unitBox, glowMat(0xffffff, 0xffffff)));
       shadows(rig);
+      outline(rig);
       const outlineSample = [new Mesh(unitBox, ghostFill.ok), new LineSegments(unitEdges, ghostLine.ok)];
       for (const item of outlineSample) item.layers.set(OVERLAY);
       ghost.add(...outlineSample);
