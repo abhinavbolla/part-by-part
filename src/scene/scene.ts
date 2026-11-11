@@ -2,6 +2,7 @@
 // a camera move or the powered-on machine. Idle, it costs nothing.
 
 import {
+  AmbientLight,
   Box3,
   BoxGeometry,
   Color,
@@ -14,25 +15,30 @@ import {
   LineSegments,
   Mesh,
   MeshBasicMaterial,
+  OrthographicCamera,
   PCFShadowMap,
-  PerspectiveCamera,
   Plane,
   PlaneGeometry,
   PMREMGenerator,
   Raycaster,
   Scene,
+  SRGBColorSpace,
   ShadowMaterial,
   Vector2,
   Vector3,
+  WebGLRenderTarget,
   WebGLRenderer,
+  type Object3D,
+  type ShaderMaterial,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import type { BuildStore, Change } from '../build/store.ts';
-import type { MotherboardPart, Step, StoragePart } from '../catalog/types.ts';
+import type { CatalogItem, MotherboardPart, Step, StoragePart } from '../catalog/types.ts';
 import { radiatorMount, slotsFrom, storageMounts, type Slots, type StorageMount } from '../rules/compat.ts';
 import { HOVER, clamp01, easeOut, seg } from './anim.ts';
-import { M, disposeModel, glowMat, shadows, tube } from './kit.ts';
+import { lineMaterial, outline, releaseLineMaterial, setEdgeView, setEdgesVisible } from './edges.ts';
+import { M, disposeModel, glowMat, setGlow, setLook, shadows, tube, type Look } from './kit.ts';
 import { boardLayout, caseLayout, type BoardLayout } from './layout.ts';
 import { buildBoard, type BoardModel } from './models/board.ts';
 import { buildCable } from './models/cables.ts';
@@ -85,7 +91,8 @@ interface Loose {
   hold?: boolean;
 }
 
-const BG = 0xf3f1ec;
+const BG = 0xffffff;
+const LOOK_KEY = 'pc-builder:look';
 const SNAP_PX = 120;
 const SHAKE = 0.42;
 
@@ -96,13 +103,14 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   renderer.shadowMap.type = PCFShadowMap;
 
   const scene = new Scene();
-  scene.background = new Color(BG);
-  const pmrem = new PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.6;
-  pmrem.dispose();
+  const paper = new Color(BG);
+  renderer.info.autoReset = false;
 
-  scene.add(new HemisphereLight(0xffffff, 0xcfc8ba, 0.75));
+  // Two looks. The drawing is flat plates under even light with every edge
+  // drawn as a line; the shaded one is lit, with shadows and reflections.
+  scene.background = paper;
+  const ambient = new AmbientLight(0xffffff, Math.PI);
+  const hemisphere = new HemisphereLight(0xffffff, 0xd4d4d8, 0.75);
   const sun = new DirectionalLight(0xffffff, 3.1);
   sun.position.set(330, 820, 760);
   sun.target.position.set(0, 200, 0);
@@ -116,9 +124,12 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   sun.shadow.camera.far = 2300;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.8;
-  scene.add(sun, sun.target);
+  scene.add(ambient, hemisphere, sun, sun.target);
+  /** Layer used to draw one part on its own, for its picture in the catalog. */
+  const SOLO = 2;
+  ambient.layers.enable(SOLO);
 
-  const ground = new Mesh(new PlaneGeometry(6000, 6000), new ShadowMaterial({ opacity: 0.26 }));
+  const ground = new Mesh(new PlaneGeometry(6000, 6000), new ShadowMaterial({ opacity: 0.2 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
@@ -128,11 +139,14 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   let lay = caseLayout(store.pcCase);
   let caseModel = buildCase(store.pcCase, lay);
   let boardFrame = new Group();
+  let caseLines: ShaderMaterial | null = null;
 
   function mountCase(): void {
     lay = caseLayout(store.pcCase);
     caseModel = buildCase(store.pcCase, lay);
     shadows(caseModel.group);
+    caseLines = lineMaterial();
+    outline(caseModel.group, caseLines);
     scene.add(caseModel.group);
     boardFrame = new Group();
     boardFrame.position.set(lay.board.x, lay.board.y, lay.board.z);
@@ -148,6 +162,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   const ghostBoxes = new Map<string, Box3[]>();
   const centers = new Map<string, Vector3>();
   const loose = new Map<string, Loose>();
+  /** Each model's line material, and which step a model's group belongs to. */
+  const linesOf = new Map<string, ShaderMaterial>();
+  const owners = new Map<Object3D, string>();
 
   const boardPart = (): MotherboardPart | undefined =>
     store.steps.find((step): step is MotherboardPart => step.category === 'motherboard');
@@ -217,7 +234,13 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   function drop(id: string): void {
     const model = models.get(id);
-    if (model) disposeModel(model.group);
+    if (model) {
+      owners.delete(model.group);
+      disposeModel(model.group);
+    }
+    const lines = linesOf.get(id);
+    if (lines) releaseLineMaterial(lines);
+    linesOf.delete(id);
     models.delete(id);
     signatures.delete(id);
     ghostBoxes.delete(id);
@@ -233,6 +256,11 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
     const model = build(step);
     shadows(model.group);
+    const lines = lineMaterial();
+    lines.uniforms.emphasis.value = linesOf.get(step.id)?.uniforms.emphasis.value ?? 0;
+    outline(model.group, lines);
+    linesOf.set(step.id, lines);
+    owners.set(model.group, step.id);
     (model.frame === 'board' ? boardFrame : caseModel.group).add(model.group);
     models.set(step.id, model);
     signatures.set(step.id, wanted);
@@ -265,17 +293,19 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   // ---- drop-target ghost ---------------------------------------------------
 
+  /** Drop targets live on their own layer, so a part can be pictured without them. */
+  const OVERLAY = 1;
   const ghost = new Group();
   scene.add(ghost);
   const unitBox = new BoxGeometry(1, 1, 1);
   const unitEdges = new EdgesGeometry(unitBox);
   const ghostFill = {
-    ok: new MeshBasicMaterial({ color: 0x1f9d55, transparent: true, opacity: 0.16, depthWrite: false }),
-    bad: new MeshBasicMaterial({ color: 0xd6452f, transparent: true, opacity: 0.16, depthWrite: false }),
+    ok: new MeshBasicMaterial({ color: 0x16a34a, transparent: true, opacity: 0.14, depthWrite: false }),
+    bad: new MeshBasicMaterial({ color: 0xdc2626, transparent: true, opacity: 0.14, depthWrite: false }),
   };
   const ghostLine = {
-    ok: new LineBasicMaterial({ color: 0x1f9d55, transparent: true, opacity: 0.9, depthTest: false }),
-    bad: new LineBasicMaterial({ color: 0xd6452f, transparent: true, opacity: 0.9, depthTest: false }),
+    ok: new LineBasicMaterial({ color: 0x16a34a, transparent: true, opacity: 0.95, depthTest: false }),
+    bad: new LineBasicMaterial({ color: 0xdc2626, transparent: true, opacity: 0.95, depthTest: false }),
   };
   let ghostStep: Step | null = null;
 
@@ -292,6 +322,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
         const line = new LineSegments(unitEdges, ghostLine[kind]);
         line.renderOrder = 10;
         for (const item of [fill, line]) {
+          item.layers.set(OVERLAY);
           item.scale.copy(size);
           item.position.copy(center);
           ghost.add(item);
@@ -303,16 +334,19 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   }
 
   function setGhostStrength(strong: boolean): void {
-    ghostFill.ok.opacity = ghostFill.bad.opacity = strong ? 0.34 : 0.16;
+    ghostFill.ok.opacity = ghostFill.bad.opacity = strong ? 0.3 : 0.14;
   }
 
   // ---- camera --------------------------------------------------------------
 
-  const camera = new PerspectiveCamera(30, 1, 50, 8000);
-  const center = new Vector3(0, lay.H * 0.48, 0);
-  const view = { az: 0.46, el: 0.26, zoom: 1 };
+  // An orthographic camera: parallel lines stay parallel, as in a technical drawing.
+  const camera = new OrthographicCamera(-1, 1, 1, -1, 10, 9000);
+  camera.layers.enable(OVERLAY);
+  const center = new Vector3(0, lay.H * 0.5, 0);
+  const view = { az: 0.62, el: 0.4, zoom: 1 };
   const viewTarget = { ...view };
-  let fitDistance = 1400;
+  /** Scene millimetres across the full height of the canvas at zoom 1. */
+  let span = 1000;
   let width = 1;
   let height = 1;
 
@@ -323,39 +357,77 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     const inset = insets();
     const freeW = Math.max(240, width - inset.left - inset.right);
     const freeH = Math.max(240, height - inset.top - inset.bottom);
-    camera.aspect = width / height;
     camera.setViewOffset(
       width, height,
       (inset.right - inset.left) / 2, (inset.bottom - inset.top) / 2,
       width, height,
     );
-    const tan = Math.tan((camera.fov * Math.PI) / 360);
-    const objectH = lay.H * 1.22;
-    const objectW = (lay.L + lay.W * 0.5) * 1.16;
-    fitDistance = Math.max(
-      objectH / 2 / (tan * (freeH / height)),
-      objectW / 2 / (tan * (freeW / height)),
-    );
-    center.set(0, lay.H * 0.48, 0);
-    camera.updateProjectionMatrix();
+    // How big the case looks from the resting angle, then fit that in the free area.
+    const [sinA, cosA] = [Math.sin(0.62), Math.cos(0.62)];
+    const [sinE, cosE] = [Math.sin(0.4), Math.cos(0.4)];
+    const objectW = lay.L * cosA + lay.W * sinA;
+    const objectH = lay.H * cosE + (lay.L * sinA + lay.W * cosA) * sinE;
+    span = Math.max((objectH * 1.14 * height) / freeH, (objectW * 1.14 * height) / freeW);
+    center.set(0, lay.H * 0.5, 0);
     invalidate();
   }
 
   function placeCamera(): void {
-    const distance = fitDistance * view.zoom;
     const cosEl = Math.cos(view.el);
     camera.position.set(
-      center.x + distance * Math.sin(view.az) * cosEl,
-      center.y + distance * Math.sin(view.el),
-      center.z + distance * Math.cos(view.az) * cosEl,
+      center.x + 3000 * Math.sin(view.az) * cosEl,
+      center.y + 3000 * Math.sin(view.el),
+      center.z + 3000 * Math.cos(view.az) * cosEl,
     );
     camera.lookAt(center);
+    const half = (span * view.zoom) / 2;
+    camera.top = half;
+    camera.bottom = -half;
+    camera.left = (-half * width) / height;
+    camera.right = (half * width) / height;
+    camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
+  }
+
+  // ---- look ----------------------------------------------------------------
+
+  let look: Look = 'drawing';
+  try {
+    if (localStorage.getItem(LOOK_KEY) === 'shaded') look = 'shaded';
+  } catch {
+    // Storage may be unavailable; the drawing look is the default.
+  }
+  let environment: ReturnType<PMREMGenerator['fromScene']>['texture'] | null = null;
+
+  function applyLook(): void {
+    const shaded = look === 'shaded';
+    setLook(look);
+    ambient.visible = !shaded;
+    hemisphere.visible = shaded;
+    sun.visible = shaded;
+    ground.visible = shaded;
+    setEdgesVisible(!shaded);
+    if (shaded && !environment) {
+      const pmrem = new PMREMGenerator(renderer);
+      environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    }
+    scene.environment = shaded ? environment : null;
+    scene.environmentIntensity = 0.6;
+    invalidate();
+  }
+
+  /** Draws one frame in the current look. */
+  function draw(): void {
+    renderer.info.reset();
+    const buffer = renderer.getDrawingBufferSize(new Vector2());
+    setEdgeView(buffer.x, buffer.y, renderer.getPixelRatio());
+    renderer.render(scene, camera);
   }
 
   function orbit(dx: number, dy: number): void {
     viewTarget.az = Math.max(-1.25, Math.min(1.25, viewTarget.az - dx * 0.006));
-    viewTarget.el = Math.max(0.03, Math.min(1.1, viewTarget.el + dy * 0.005));
+    viewTarget.el = Math.max(0.05, Math.min(1.2, viewTarget.el + dy * 0.005));
     invalidate();
   }
 
@@ -389,6 +461,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     loose.clear();
     visitor = null;
     caseModel.group.removeFromParent();
+    if (caseLines) releaseLineMaterial(caseLines);
     mountCase();
     s = store.cursor;
     resize();
@@ -396,13 +469,12 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   function onStoreChange(change: Change): void {
     setPower(false);
-    if (change.kind === 'case') {
+    // A new case, or a build loaded afresh: draw everything again from the data.
+    if (change.kind === 'case' || change.kind === 'reset') {
       swapCase();
       return;
     }
-    if (change.kind === 'reset') {
-      s = store.cursor;
-    } else if (change.kind === 'install' && change.step && change.index !== undefined) {
+    if (change.kind === 'install' && change.step && change.index !== undefined) {
       ensure(change.step);
       const start = loose.get(change.step.id)?.p ?? 0;
       loose.delete(change.step.id);
@@ -543,13 +615,75 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     const seated = new Set(store.installed.map((step) => step.id));
     const spin = dt * 15 * power;
     for (const rotor of caseModel.rotors) rotor.rotation.z += spin;
-    for (const material of caseModel.glow) material.emissiveIntensity = power * 1.6;
+    for (const material of caseModel.glow) setGlow(material, power);
     for (const [id, model] of models) {
       const on = seated.has(id) ? power : 0;
-      for (const material of model.glow) material.emissiveIntensity = on * 1.2;
+      for (const material of model.glow) setGlow(material, on);
       if (on > 0) for (const rotor of model.rotors) rotor.rotation.z += spin * 1.25;
     }
     return true;
+  }
+
+  // ---- what is picked out ----------------------------------------------------
+
+  /** The step under the pointer in the scene, and the one whose row is hovered in a list. */
+  let pointed: string | null = null;
+  let named: string | null = null;
+
+  /** Finds the part under the pointer. The case itself hides what is behind it. */
+  function hoverAt(clientX: number, clientY: number): string | null {
+    let found: string | null = null;
+    if (!visitor) {
+      const rect = canvas.getBoundingClientRect();
+      ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      for (const hitAt of raycaster.intersectObject(caseModel.group, true)) {
+        let node: Object3D | null = hitAt.object;
+        let owner: string | undefined;
+        let hidden = false;
+        while (node && node !== caseModel.group) {
+          if (!node.visible) hidden = true;
+          owner ??= owners.get(node);
+          node = node.parent;
+        }
+        if (hidden) continue;
+        found = owner ?? null;
+        break;
+      }
+    }
+    if (found !== pointed) {
+      pointed = found;
+      invalidate();
+    }
+    return found;
+  }
+
+  /**
+   * Lines rest light. The part under the pointer, the one named in a list, the
+   * one being offered and the one going in or out are drawn dark, fading in.
+   */
+  function stepEmphasis(dt: number): boolean {
+    const lit = new Set<string>();
+    if (pointed) lit.add(pointed);
+    if (named) lit.add(named);
+    if (visitor) lit.add(visitor.step.id);
+    for (const id of loose.keys()) lit.add(id);
+    const target = scrubbing ? s : store.cursor;
+    if (s !== target && store.steps.length) {
+      const index = Math.max(0, Math.min(store.steps.length - 1, s < target ? Math.floor(s) : Math.ceil(s) - 1));
+      lit.add(store.steps[index].id);
+    }
+    let moving = false;
+    for (const [id, lines] of linesOf) {
+      const goal = lit.has(id) ? 1 : 0;
+      const level = lines.uniforms.emphasis;
+      if (level.value === goal) continue;
+      level.value = goal > level.value
+        ? Math.min(goal, level.value + dt / 0.12)
+        : Math.max(goal, level.value - dt / 0.28);
+      moving = true;
+    }
+    return moving;
   }
 
   // ---- frame loop ----------------------------------------------------------
@@ -635,6 +769,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     }
     if (stepLoose(dt)) active = true;
     if (applyPower(dt)) active = true;
+    if (stepEmphasis(dt)) active = true;
 
     const ease = 1 - Math.exp(-dt * 14);
     for (const key of ['az', 'el', 'zoom'] as const) {
@@ -648,7 +783,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     }
     placeCamera();
 
-    renderer.render(scene, camera);
+    draw();
 
     stats.rendered++;
     stats.drawCalls = renderer.info.render.calls;
@@ -669,6 +804,101 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     }
     lastTime = active ? now : 0;
     if (active) invalidate();
+  }
+
+  // ---- pictures of single parts ---------------------------------------------
+
+  let studio: { out: WebGLRenderTarget; camera: OrthographicCamera; canvas: HTMLCanvasElement } | null = null;
+  const REST = new Vector3(Math.sin(0.62) * Math.cos(0.4), Math.sin(0.4), Math.cos(0.62) * Math.cos(0.4));
+
+  /**
+   * Draws `target` alone, from the resting angle, and returns it as an image
+   * address. `scale` is how many picture pixels make one pixel where it is shown.
+   */
+  function picture(target: Object3D, w: number, h: number, scale: number): string {
+    studio ??= {
+      out: new WebGLRenderTarget(1, 1, { samples: 4 }),
+      camera: new OrthographicCamera(-1, 1, 1, -1, 10, 9000),
+      canvas: document.createElement('canvas'),
+    };
+    const { out, camera: eye, canvas: sheet } = studio;
+    out.texture.colorSpace = SRGBColorSpace;
+    if (out.width !== w || out.height !== h) {
+      out.setSize(w, h);
+      sheet.width = w;
+      sheet.height = h;
+    }
+
+    target.updateWorldMatrix(true, true);
+    const bounds = new Box3().setFromObject(target);
+    const middle = bounds.getCenter(new Vector3());
+    eye.position.copy(middle).addScaledVector(REST, 3000);
+    eye.lookAt(middle);
+    eye.updateMatrixWorld();
+    const right = new Vector3().setFromMatrixColumn(eye.matrixWorld, 0);
+    const up = new Vector3().setFromMatrixColumn(eye.matrixWorld, 1);
+    let halfW = 1;
+    let halfH = 1;
+    const corner = new Vector3();
+    for (let i = 0; i < 8; i++) {
+      corner.set(
+        i & 1 ? bounds.max.x : bounds.min.x,
+        i & 2 ? bounds.max.y : bounds.min.y,
+        i & 4 ? bounds.max.z : bounds.min.z,
+      ).sub(middle);
+      halfW = Math.max(halfW, Math.abs(corner.dot(right)));
+      halfH = Math.max(halfH, Math.abs(corner.dot(up)));
+    }
+    const half = Math.max(halfH, (halfW * h) / w) * 1.16;
+    eye.top = half;
+    eye.bottom = -half;
+    eye.left = (-half * w) / h;
+    eye.right = (half * w) / h;
+    eye.updateProjectionMatrix();
+
+    target.traverse((node) => node.layers.set(SOLO));
+    eye.layers.set(SOLO);
+    setEdgeView(w, h, scale);
+    renderer.setRenderTarget(out);
+    renderer.render(scene, eye);
+    renderer.setRenderTarget(null);
+    target.traverse((node) => node.layers.set(0));
+
+    const pixels = new Uint8Array(w * h * 4);
+    renderer.readRenderTargetPixels(out, 0, 0, w, h, pixels);
+    const context = sheet.getContext('2d')!;
+    const image = context.createImageData(w, h);
+    for (let row = 0; row < h; row++) {
+      image.data.set(pixels.subarray((h - 1 - row) * w * 4, (h - row) * w * 4), row * w * 4);
+    }
+    context.putImageData(image, 0, 0);
+    return sheet.toDataURL('image/png');
+  }
+
+  /**
+   * A line drawing of one catalog item on its own, or null when one cannot be
+   * made right now (the shaded look is on, or something is being dragged).
+   */
+  function thumbnail(item: CatalogItem | Step, w: number, h: number, scale: number): string | null {
+    if (look !== 'drawing' || visitor || item.category === 'cable') return null;
+    if (item.category === 'case') {
+      const model = buildCase(item, caseLayout(item));
+      const lines = lineMaterial();
+      outline(model.group, lines);
+      scene.add(model.group);
+      const url = picture(model.group, w, h, scale);
+      disposeModel(model.group);
+      releaseLineMaterial(lines);
+      return url;
+    }
+    const model = ensure(item);
+    const was = lastP.get(item.id) ?? 0;
+    model.group.visible = true;
+    model.setProgress(1, false);
+    model.group.scale.setScalar(1);
+    const url = picture(model.group, w, h, scale);
+    pose(item.id, was, false, true);
+    return url;
   }
 
   const whenIdle = (task: () => void): void => {
@@ -693,12 +923,18 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       rig.add(new InstancedMesh(unitBox, M.alu, 2));
       tube(rig, [[0, 0, 0], [10, 10, 0], [20, 0, 0]], 2, M.cable);
       rig.add(new Mesh(unitBox, glowMat(0xffffff, 0xffffff)));
-      rig.add(new Mesh(unitBox, ghostFill.ok), new LineSegments(unitEdges, ghostLine.ok));
       shadows(rig);
+      const rigLines = lineMaterial();
+      outline(rig, rigLines);
+      const outlineSample = [new Mesh(unitBox, ghostFill.ok), new LineSegments(unitEdges, ghostLine.ok)];
+      for (const item of outlineSample) item.layers.set(OVERLAY);
+      ghost.add(...outlineSample);
       scene.add(rig);
-      renderer.render(scene, camera);
+      draw();
+      ghost.remove(...outlineSample);
       disposeModel(rig);
-      renderer.render(scene, camera);
+      releaseLineMaterial(rigLines);
+      draw();
       done?.();
       performance.mark('scene-warm');
     });
@@ -716,6 +952,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     whenIdle(step);
   }
 
+  applyLook();
   resize();
   window.addEventListener('resize', resize);
   invalidate();
@@ -724,6 +961,14 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     prepare: (step: Step): void => { ensure(step); },
     warm,
     warmShaders,
+    thumbnail,
+    hoverAt,
+    /** Picks out the part with this id (a row hovered in a list), or none. */
+    emphasize(id: string | null): void {
+      if (named === id) return;
+      named = id;
+      invalidate();
+    },
     showGhost,
     dragStart,
     dragMove,
@@ -744,6 +989,17 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     resize,
     setPower,
     get powered(): boolean { return powered; },
+    get look(): Look { return look; },
+    /** Switches between the line drawing and the shaded view, and remembers the choice. */
+    setLook(next: Look): void {
+      look = next;
+      try {
+        localStorage.setItem(LOOK_KEY, next);
+      } catch {
+        // Not remembered; it still applies for this visit.
+      }
+      applyLook();
+    },
     /** Timestamp of the input event the next frame answers, for the latency readout. */
     markInput(timeStamp: number): void { pendingInput = timeStamp; },
     stats,

@@ -188,6 +188,32 @@ async function follow(page, selector, expect, pause = 80) {
   return page.evaluate(() => window.__pcb.router.lastSwap);
 }
 
+/**
+ * How often this browser draws a frame when the page does nothing costly.
+ * Normally 16.7 ms; on battery in Low Power Mode Chrome halves it to 33.3 ms,
+ * and then no page can be shown to be smoother than that.
+ */
+async function frameInterval(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto('data:text/html,<body><i id=a style="display:block;width:9px;height:9px;background:%23000"></i></body>');
+  const interval = await page.evaluate(() => new Promise((resolve) => {
+    const times = [];
+    let last = 0;
+    let count = 0;
+    const tick = (now) => {
+      if (last) times.push(now - last);
+      last = now;
+      document.getElementById('a').style.marginLeft = `${count % 40}px`;
+      if (++count < 90) requestAnimationFrame(tick);
+      else resolve(times.sort((a, b) => a - b)[Math.floor(times.length / 2)]);
+    };
+    requestAnimationFrame(tick);
+  }));
+  await context.close();
+  return interval;
+}
+
 async function interact(browser, profile) {
   const { context, page, errors } = await open(browser, profile);
   const failures = [];
@@ -288,6 +314,33 @@ async function interact(browser, profile) {
   expect((await page.locator('.wire.in').count()) === wires, 'all cables plug in');
   await snap('built');
 
+  // Pointing at a part in the drawing names it; clicking it opens its page.
+  const spot = await page.evaluate((id) => {
+    const scene = window.__pcb.scene();
+    const rect = document.getElementById('view').getBoundingClientRect();
+    for (let y = rect.top + 80; y < rect.bottom - 120; y += 12) {
+      for (let x = rect.left + 420; x < rect.right - 380; x += 12) {
+        if (scene.hoverAt(x, y) === id) return { x, y };
+      }
+    }
+    return null;
+  }, GPU);
+  expect(spot !== null, 'the graphics card can be found under the pointer');
+  if (spot) {
+    await page.mouse.move(spot.x - 3, spot.y - 3);
+    await page.mouse.move(spot.x, spot.y);
+    await page.waitForTimeout(250);
+    expect((await page.textContent('#chip')) === 'Dual GeForce RTX 4070' && await page.isVisible('#chip'), 'pointing at a part names it');
+    await snap('pointing');
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.waitForSelector(`.detail[data-id="${GPU}"]`, { timeout: 5000 }).catch(() => {});
+    expect(await page.evaluate(() => location.pathname) === `/parts/gpu/asus-dual-rtx-4070/`, 'clicking a part opens its page');
+    await page.mouse.move(700, 880);
+    await follow(page, '.crumbs a[href="/parts/gpu/"]', `.card[data-id="${GPU}"]`);
+    await settled(page);
+  }
+
   // Undo, redo, and a part that something depends on.
   await press(page, '#undo');
   await settled(page);
@@ -382,6 +435,10 @@ const countFiles = (dir) => readdirSync(dir, { withFileTypes: true })
   .reduce((sum, entry) => sum + (entry.isDirectory() ? countFiles(join(dir, entry.name)) : entry.name === 'index.html' ? 1 : 0), 0);
 console.log(`  ${countFiles(DIST)} pre-rendered pages`);
 
+const beat = await frameInterval(browser);
+console.log(`\nBrowser frame interval: ${round(beat, 1)} ms${beat > 20 ? '  (capped: the machine is saving power, so frame figures below cannot show 60 fps)' : ''}`);
+const late = beat * 1.25;
+
 let failed = false;
 for (const profile of PROFILES) {
   const home = [];
@@ -393,7 +450,7 @@ for (const profile of PROFILES) {
   const pick = (loads, key) => median(loads.map((load) => load[key]));
   const run = await interact(browser, profile);
   const frames = (values) =>
-    `p50 ${round(quantile(values, 0.5), 1)} ms, p95 ${round(quantile(values, 0.95), 1)} ms, worst ${round(Math.max(0, ...values), 1)} ms, ${values.filter((ms) => ms > 20).length} of ${values.length} over 20 ms`;
+    `p50 ${round(quantile(values, 0.5), 1)} ms, p95 ${round(quantile(values, 0.95), 1)} ms, worst ${round(Math.max(0, ...values), 1)} ms, ${values.filter((ms) => ms > late).length} of ${values.length} late`;
 
   console.log(`\n${profile.name}  (median of ${RUNS} cold loads)`);
   console.log(`  WebGL renderer            ${run.renderer}`);

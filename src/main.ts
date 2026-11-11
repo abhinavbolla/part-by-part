@@ -3,7 +3,7 @@
 // so the page is readable and clickable before any 3D code has arrived.
 
 import { BuildStore } from './build/store.ts';
-import { loadCategory, peek, remember, searchIndex, type SearchEntry } from './catalog/client.ts';
+import { itemsOf, loadCategory, peek, remember, searchIndex, type SearchEntry } from './catalog/client.ts';
 import type { CasePart, CatalogItem, Category, Step } from './catalog/types.ts';
 import { CATEGORY_LABEL, CATEGORY_ORDER, isCable } from './catalog/types.ts';
 import { isBlocked, isMisfit } from './rules/compat.ts';
@@ -29,6 +29,7 @@ const callout = el('callout');
 const chip = el('chip');
 const notice = el('notice');
 const hud = el('hud');
+const lookButton = el<HTMLButtonElement>('look');
 
 const SAVE_KEY = 'pc-builder:build';
 const boot = JSON.parse(el('boot').textContent ?? '{}') as { case: CasePart };
@@ -39,6 +40,24 @@ try {
   // A build that cannot be read is simply not restored.
 }
 remember([store.pcCase, ...store.steps.filter((step): step is Exclude<Step, { category: 'cable' }> => !isCable(step))]);
+
+/**
+ * A saved build carries its parts as they were when it was saved. Once the
+ * catalog arrives, swap in the current data, so a part that has since gained
+ * detail is drawn with it.
+ */
+function refreshSaved(): void {
+  const saved = store.save();
+  const categories = new Set<Category>(['case']);
+  for (const step of saved.steps) if (!isCable(step)) categories.add(step.category);
+  void Promise.all([...categories].map((category) => loadCategory(category))).then(() => {
+    const pcCase = peek(saved.case.id);
+    const steps = saved.steps.map((step) => (isCable(step) ? step : (peek(step.id) as Step | undefined) ?? step));
+    const fresh = { ...saved, case: pcCase && pcCase.category === 'case' ? pcCase : saved.case, steps };
+    if (JSON.stringify(fresh) !== JSON.stringify(saved)) store.restore(fresh);
+  }).catch(() => undefined);
+}
+refreshSaved();
 
 let scene: SceneApi | null = null;
 let powered = false;
@@ -71,7 +90,9 @@ const sceneReady = import('./scene/scene.ts').then((module) => {
   scene.warmShaders(() => {
     refresh();
     fetchCategoriesAhead();
+    drawPictures();
   });
+  lookButton.textContent = scene.look === 'drawing' ? 'Shaded' : 'Drawing';
   scene.warm(store.steps);
   warmCategory(categoryOf(location.pathname));
   return scene;
@@ -89,7 +110,12 @@ function fetchCategoriesAhead(): void {
   const next = (): void => {
     const category = queue.shift();
     if (!category) return;
-    void prefetch(`/parts/${category}/`).catch(() => undefined).then(() => setTimeout(next, 30));
+    void prefetch(`/parts/${category}/`).catch(() => undefined)
+      .then(() => loadCategory(category).catch(() => undefined))
+      .then(() => {
+        drawPictures();
+        setTimeout(next, 30);
+      });
   };
   setTimeout(next, 200);
 }
@@ -101,6 +127,78 @@ function warmCategory(category: Category | null): void {
     scene?.warm(items.filter((item): item is Exclude<CatalogItem, CasePart> => item.category !== 'case'));
     refresh();
   }).catch(() => undefined);
+}
+
+// ---- pictures of parts ---------------------------------------------------------
+
+/** Line drawings of single parts, made in the browser from the same models the build uses. */
+const pictures = new Map<string, string>();
+const figures = new Map<string, string>();
+let drawing = false;
+
+/** The part that stands for a category on the home sheet: what is seated, else its first item. */
+function faceOf(category: Category): CatalogItem | undefined {
+  const slots = store.slots;
+  if (category === 'case') return slots.case;
+  const seated = category === 'storage' ? slots.storage[0] : slots[category];
+  return seated ?? itemsOf(category)?.[0];
+}
+
+/** Shows a drawing in the box that was reserved for it, so nothing around it moves. */
+function fill(box: Element | null, url: string): void {
+  if (!box) return;
+  const shown = box.querySelector('img');
+  if (shown) {
+    if (shown.src !== url) shown.src = url;
+    return;
+  }
+  const image = new Image();
+  image.alt = '';
+  image.draggable = false;
+  image.src = url;
+  box.replaceChildren(image);
+}
+
+/** Puts the pictures already made into the cards on screen, and queues the rest. */
+function drawPictures(): void {
+  const waiting: HTMLElement[] = [];
+  for (const link of panel.querySelectorAll<HTMLElement>('.catlink')) {
+    const face = faceOf(link.dataset.cat as Category);
+    if (!face) continue;
+    link.dataset.id = face.id;
+    const url = pictures.get(face.id);
+    if (url) fill(link.querySelector('.shot'), url);
+    else waiting.push(link);
+  }
+  for (const card of panel.querySelectorAll<HTMLElement>('.card[data-id]')) {
+    const id = card.dataset.id!;
+    if (card.classList.contains('detail')) {
+      const item = peek(id);
+      const url = figures.get(id) ?? (item && scene?.thumbnail(item, 660, 528, 2));
+      if (!url) continue;
+      figures.set(id, url);
+      fill(card.querySelector('.figure'), url);
+      continue;
+    }
+    const url = pictures.get(id);
+    if (url) fill(card.querySelector('.shot'), url);
+    else if (peek(id)) waiting.push(card);
+  }
+  if (drawing || !waiting.length || !scene || scene.look !== 'drawing') return;
+  drawing = true;
+  const next = (): void => {
+    drawing = false;
+    const card = waiting.shift();
+    const item = card && (peek(card.dataset.id!) ?? (card.dataset.id === store.pcCase.id ? store.pcCase : undefined));
+    // Wait for a quiet moment: a picture takes a few milliseconds of the main thread.
+    if (item && scene?.stats.settled) {
+      const url = scene.thumbnail(item, 168, 132, 3);
+      if (url) pictures.set(item.id, url);
+    }
+    drawPictures();
+  };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(next, { timeout: 400 });
+  else setTimeout(next, 40);
 }
 
 // ---- looking things up -------------------------------------------------------
@@ -203,6 +301,7 @@ function refresh(): void {
     link.classList.toggle('in', chosen.length > 0);
   }
   applyFilters();
+  drawPictures();
 
   const total = store.steps.length;
   undo.disabled = store.cursor === 0;
@@ -351,6 +450,8 @@ let suppressClick = false;
 
 function hover(item: CatalogItem | Step | null): void {
   if (press?.dragging) return;
+  // A row for something already in the case picks it out in the drawing.
+  scene?.emphasize(item && item.category !== 'case' && store.isInstalled(item.id) ? item.id : null);
   const step = item && item.category !== 'case' && !store.isInstalled(item.id) ? item : null;
   const id = step?.id ?? null;
   if (id === hovered) return;
@@ -513,6 +614,12 @@ replay.addEventListener('click', (event) => {
   scene?.markInput(event.timeStamp);
   scene?.replay();
 });
+lookButton.addEventListener('click', () => {
+  if (!scene) return;
+  scene.setLook(scene.look === 'drawing' ? 'shaded' : 'drawing');
+  lookButton.textContent = scene.look === 'drawing' ? 'Shaded' : 'Drawing';
+  drawPictures();
+});
 window.addEventListener('keydown', (event) => {
   if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
   if (event.target === search) return;
@@ -523,22 +630,61 @@ window.addEventListener('keydown', (event) => {
 
 // ---- looking around ---------------------------------------------------------
 
-let orbit: { id: number; x: number; y: number } | null = null;
+let orbit: { id: number; x: number; y: number; moved: number } | null = null;
+let pointer: { x: number; y: number } | null = null;
+let picking = 0;
+
+/** Names the part under the pointer; the scene draws it dark. */
+function pick(): void {
+  picking = 0;
+  if (!scene || !pointer || orbit?.moved || press?.dragging) return;
+  const id = scene.hoverAt(pointer.x, pointer.y);
+  const step = id ? store.steps.find((item) => item.id === id) : undefined;
+  chip.hidden = !step;
+  if (step) {
+    chip.textContent = step.name;
+    chip.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 16}px)`;
+  }
+  canvas.style.cursor = step && !isCable(step) ? 'pointer' : '';
+}
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
-  orbit = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  orbit = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: 0 };
   canvas.setPointerCapture(event.pointerId);
-  canvas.classList.add('orbit');
 });
 canvas.addEventListener('pointermove', (event) => {
-  if (!orbit || event.pointerId !== orbit.id) return;
-  scene?.orbit(event.clientX - orbit.x, event.clientY - orbit.y);
-  orbit.x = event.clientX;
-  orbit.y = event.clientY;
+  pointer = { x: event.clientX, y: event.clientY };
+  if (orbit && event.pointerId === orbit.id) {
+    const dx = event.clientX - orbit.x;
+    const dy = event.clientY - orbit.y;
+    orbit.moved += Math.abs(dx) + Math.abs(dy);
+    // A press that barely moves is a click on a part, not a turn of the case.
+    if (orbit.moved > 4) {
+      canvas.classList.add('orbit');
+      chip.hidden = true;
+      scene?.orbit(dx, dy);
+    }
+    orbit.x = event.clientX;
+    orbit.y = event.clientY;
+    return;
+  }
+  if (!picking) picking = requestAnimationFrame(pick);
 });
-const endOrbit = (): void => {
+canvas.addEventListener('pointerleave', () => {
+  pointer = null;
+  scene?.hoverAt(-1e6, -1e6);
+  chip.hidden = true;
+});
+const endOrbit = (event: PointerEvent): void => {
+  const clicked = orbit && orbit.moved <= 4 && event.type === 'pointerup';
   orbit = null;
   canvas.classList.remove('orbit');
+  if (!clicked || !scene) return;
+  // A click on a part opens its page.
+  const id = scene.hoverAt(event.clientX, event.clientY);
+  const step = id ? store.steps.find((item) => item.id === id) : undefined;
+  if (step && !isCable(step)) void router.go(`/parts/${step.category}/${step.id}/`);
 };
 canvas.addEventListener('pointerup', endOrbit);
 canvas.addEventListener('pointercancel', endOrbit);

@@ -34,6 +34,15 @@ come together.
   card length (less a front radiator) and slot width, cooler height and socket,
   radiator mounts, M.2 slot count, length and SATA support, drive mounts, power
   supply size, connectors and wattage, and a display output.
+- **Two looks:** the build is drawn as an isometric line drawing by default,
+  and a switch on the timeline shows it shaded instead. Lines rest light; the
+  part under the pointer, or the one going in, is drawn dark and named, and a
+  click on it opens its page. Every part in the catalog gets its own small
+  drawing, made in the browser from the same model.
+- **Parts drawn from what they are:** processor lids differ by socket, coolers
+  show their heat pipes and covers, memory shows its heat-spreader outline,
+  graphics cards their fins, backplate and bracket, and each case its own
+  front, top, ports and feet.
 - **Your build is kept** in the browser and comes back after a reload.
 - **Power on** once it is complete and wired: fans spin, lights come on.
 
@@ -56,8 +65,9 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
 ## How it is built
 
 - **No model files.** Every part is generated in code from its catalog
-  dimensions (`src/scene/models`). Parts are the right size and shape for their
-  specs; they carry no logos and do not copy any product's styling.
+  dimensions and a few recorded features (`src/scene/models`). Parts are the
+  right size and carry their real structure; they carry no logos and are not
+  exact replicas of any product.
 - **One number per step.** Seating a part or plugging a cable is a progress
   value from 0 to 1 and every pose is a pure function of it
   (`src/scene/anim.ts`). Undo, replay and scrubbing are the same mechanism.
@@ -74,27 +84,43 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
   grows.
 - **Idle means idle.** The scene draws a frame only when something moves, and
   shaders and parts are prepared while the page is idle.
+- **The lines are real geometry.** Every edge of every shape is a thin strip
+  that always faces the screen at a fixed width and fades over its last pixel,
+  so lines stay smooth and stay put while the view turns. Each edge knows the
+  two faces it joins; per frame it is an outline (one face toward you, one
+  away), a crease (both toward you, drawn fainter) or hidden. Curved shapes get
+  their outline wherever it falls (`src/scene/edges.ts`). The style takes its
+  cue from [hairline](https://github.com/lucasmarkes/hairline) by Lucas Markes;
+  none of its code is used.
+- **Nothing shifts.** The box for a part's drawing is sized in the HTML before
+  the drawing exists, so lists do not move when drawings arrive.
 
 Dependencies: `three` at runtime; Vite, TypeScript and `playwright-core` (for
 `npm run measure`, using the installed Chrome) for development.
 
 ## Measured
 
-`npm run measure`, 11 November 2026, Apple M4, Chrome, production build served
-with Brotli. Medians of five cold loads; interaction figures from a scripted
-build of 14 steps driven with real mouse events.
+`npm run measure`, 11 November 2026 (after the redesign), Apple M4 on mains
+power, Chrome, production build served with Brotli. Medians of five cold
+loads; interaction figures from a scripted build of 14 steps driven with real
+mouse events.
 
 | | This machine | 4x slower CPU, Fast 4G |
 |---|---|---|
-| Home: first paint | 60 ms | 312 ms |
-| Home: first 3D frame | 161 ms | 812 ms |
-| A part's page opened directly: first paint | 68 ms | 312 ms |
-| Category page swap (median / worst) | 16.6 / 18.5 ms | 30.1 / 103.7 ms |
-| Part page swap, link not hovered first | 8.2 ms | 204.5 ms |
-| Click to first animation frame (median / worst) | 6.1 / 17.8 ms | 23.9 / 34.4 ms |
-| Frames over 20 ms while building | 0 of 918 | 3 of 915 |
+| Home: first paint | 32 ms | 252 ms |
+| Home: first 3D frame | 74 ms | 662 ms |
+| A part's page opened directly: first paint | 36 ms | 252 ms |
+| Category page swap (median / worst) | 17.5 / 31 ms | 18.3 / 106 ms |
+| Part page swap, link not hovered first | 25.7 ms | 202.6 ms |
+| Click to first animation frame (median / worst) | 8.9 / 17.4 ms | 17.5 / 21.9 ms |
+| Late frames while building (60 fps) | 0 of 1030 | 0 of 1030 |
 | Frames drawn while idle | 0 | 0 |
-| Transferred on first load | 139 KB, 3 requests | 139 KB, 3 requests |
+| Transferred on first load | 147 KB, 4 requests | 147 KB, 4 requests |
+
+One frame of a fully built machine costs 6.1 ms as a line drawing and 7.5 ms
+shaded (CPU and GPU together, at 2880 x 1800, timed by forcing the GPU to
+finish). The script reports when the display is capped by power saving, since
+no page can be shown to be smoother than the browser's own frame interval.
 
 The throttled column slows the CPU and network only; the GPU is still this
 machine's. Nothing has been measured on a phone or a low-end laptop, and only
@@ -104,6 +130,9 @@ Chrome has been run.
 
 Specs in `src/catalog/data` were entered by hand from each manufacturer's own
 product page on 11 November 2026, and every part records the page it came from.
+Cases, coolers and memory also carry a `look` entry, read from the same pages'
+text and photos: what the front panel is, how many heat pipes, the shape of a
+heat spreader's top. It is used only to draw them.
 Where a maker does not print a value it is marked in the data file: for example
 AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model

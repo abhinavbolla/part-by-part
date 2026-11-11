@@ -26,7 +26,7 @@ export function specLine(item: CatalogItem): string {
     case 'cooler':
       return item.kind === 'aio'
         ? `Liquid · ${item.radiator.size} mm radiator`
-        : `Air · ${item.height} mm tall · ${item.fans} × ${item.fanSize} mm`;
+        : `Air · ${item.height} mm · ${item.fans} × ${item.fanSize}`;
     case 'ram':
       return `${item.ramType} · ${item.modules} × ${item.gbPerModule} GB · ${item.speed}`;
     case 'storage':
@@ -193,7 +193,7 @@ const facetAttrs = (item: CatalogItem): string =>
 /** A catalog row: the part itself (drag or click), a link to its page, and a remove button. */
 function row(item: CatalogItem): string {
   return `<div class="card" data-id="${item.id}"${facetAttrs(item)}>
-<button class="pick" type="button">${icon(item.category)}<span class="txt"><b>${esc(item.name)}</b><i>${esc(item.brand)}</i><span class="spec">${esc(specLine(item))}</span><span class="why"></span></span></button>
+<button class="pick" type="button"><span class="shot">${icon(item.category)}</span><span class="txt"><b>${esc(item.name)}</b><i>${esc(item.brand)}</i><span class="spec">${esc(specLine(item))}</span><span class="why"></span></span></button>
 <a class="more" data-nav href="${itemPath(item)}" aria-label="Details for ${esc(item.name)}">Details</a>
 <button class="rm" type="button" data-remove="${item.id}" hidden>Remove</button>
 </div>`;
@@ -210,7 +210,7 @@ export interface Page {
 export function homePage(catalog: CatalogItem[]): Page {
   const links = CATEGORY_ORDER.map((category) => {
     const count = catalog.filter((item) => item.category === category).length;
-    return `<a class="catlink" data-nav data-cat="${category}" href="${categoryPath(category)}">${icon(category)}<span class="txt"><b>${CATEGORY_PLURAL[category]}</b><span class="cur"></span></span><span class="n">${count}</span></a>`;
+    return `<a class="catlink" data-nav data-cat="${category}" href="${categoryPath(category)}"><span class="shot">${icon(category)}</span><span class="txt"><b>${CATEGORY_PLURAL[category]}</b><span class="cur"></span></span><span class="n">${count}</span></a>`;
   }).join('');
   return {
     path: '/',
@@ -260,6 +260,7 @@ export function itemPage(item: CatalogItem): Page {
     panel: `<div class="page" data-title="${esc(title)}" data-kind="item" data-cat="${item.category}">
 <p class="crumbs"><a data-nav href="/">Parts</a><span>/</span><a data-nav href="${categoryPath(item.category)}">${CATEGORY_PLURAL[item.category]}</a></p>
 <div class="card detail" data-id="${item.id}">
+<div class="figure"></div>
 <h2 class="name">${esc(item.name)}</h2>
 <p class="by">${esc(item.brand)} · ${esc(item.sku)}</p>
 <button class="pick act" type="button">${icon(item.category)}<span class="txt"><b>${action}</b><span class="why"></span></span></button>

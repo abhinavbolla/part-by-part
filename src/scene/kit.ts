@@ -5,12 +5,16 @@
 import {
   BoxGeometry,
   CatmullRomCurve3,
+  Color,
   CylinderGeometry,
   ExtrudeGeometry,
   Group,
   InstancedMesh,
+  Matrix4,
   Mesh,
   MeshStandardMaterial,
+  Object3D as Node3D,
+  Path,
   Shape,
   TubeGeometry,
   Vector3,
@@ -23,11 +27,23 @@ const UNIT_BOX = new BoxGeometry(1, 1, 1);
 const UNIT_CYL = new CylinderGeometry(1, 1, 1, 24);
 const UNIT_CYL_LOW = new CylinderGeometry(1, 1, 1, 10);
 const rounded = new Map<string, RoundedBoxGeometry>();
+const accentColor = new Color(0xff5a1f);
 
 export { UNIT_BOX };
 
+/**
+ * Faces sit a hair behind their true depth, so the lines drawn along their
+ * edges always win against the face they belong to.
+ */
+function setBack(material: MeshStandardMaterial): MeshStandardMaterial {
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = 1;
+  material.polygonOffsetUnits = 2;
+  return material;
+}
+
 export function mat(color: number, roughness = 0.6, metalness = 0): MeshStandardMaterial {
-  return new MeshStandardMaterial({ color, roughness, metalness });
+  return setBack(new MeshStandardMaterial({ color, roughness, metalness }));
 }
 
 /** Shared palette. Parts that light up get their own material instead. */
@@ -63,6 +79,57 @@ export const M = {
   hose: mat(0x121315, 0.7, 0.05),
   radiator: mat(0x202226, 0.55, 0.4),
 };
+
+export type Look = 'drawing' | 'shaded';
+
+/** Fills for the line-drawing look: near-white plates in a few greys, cables the grey of a resting line. */
+const DRAWN: Record<keyof typeof M, number> = {
+  caseOuter: 0xfcfcfc, caseInner: 0xf4f4f5, vent: 0xe4e4e7, pcb: 0xe7e7ea, substrate: 0xdddde1,
+  heatsink: 0xffffff, heatsinkDark: 0xeeeef0, slot: 0xd6d6da, slotAlt: 0xe6e6e9, steel: 0xffffff,
+  gold: 0xf3f1ea, copper: 0xf2eee9, alu: 0xffffff, fanFrame: 0xebebee, fanBlade: 0xf7f7f8,
+  brass: 0xf1eee5, screw: 0xffffff, black: 0xd2d2d7, ramBlack: 0xdcdce0, ramGrey: 0xeeeef1,
+  gpuShroud: 0xe5e5e9, gpuBack: 0xf5f5f7, psu: 0xe2e2e6, label: 0xffffff, labelDim: 0xf8f8f9,
+  chip: 0xcbcbd1, cable: 0x9d9da6, cableData: 0xaab1bf, hose: 0x9d9da6, radiator: 0xdedee2,
+};
+
+/** The one highlight colour of the drawing look: whatever is lit. */
+export const ACCENT = 0xff5a1f;
+
+const SHADED = Object.fromEntries(
+  Object.entries(M).map(([key, material]) => [
+    key,
+    { color: material.color.getHex(), roughness: material.roughness, metalness: material.metalness },
+  ]),
+) as Record<keyof typeof M, { color: number; roughness: number; metalness: number }>;
+
+/** Materials that light up, with the colour they rest at in the shaded look. */
+const glows = new Map<MeshStandardMaterial, number>();
+let look: Look = 'shaded';
+
+/** Switches every shared material between flat drawing fills and shaded surfaces. */
+export function setLook(next: Look): void {
+  look = next;
+  for (const key of Object.keys(M) as (keyof typeof M)[]) {
+    const material = M[key];
+    const shaded = SHADED[key];
+    material.color.setHex(next === 'drawing' ? DRAWN[key] : shaded.color);
+    material.roughness = next === 'drawing' ? 1 : shaded.roughness;
+    material.metalness = next === 'drawing' ? 0 : shaded.metalness;
+  }
+  for (const material of glows.keys()) setGlow(material, 0);
+}
+
+/** Lights a glow material by `amount` (0..1) in whichever way the current look shows light. */
+export function setGlow(material: MeshStandardMaterial, amount: number): void {
+  const rest = glows.get(material) ?? 0xffffff;
+  if (look === 'drawing') {
+    material.emissiveIntensity = 0;
+    material.color.setHex(0xffffff).lerp(accentColor, Math.min(1, amount));
+  } else {
+    material.color.setHex(rest);
+    material.emissiveIntensity = amount * 1.4;
+  }
+}
 
 export function box(
   parent: Object3D,
@@ -123,6 +190,92 @@ export function screw(parent: Object3D, x: number, y: number, z: number, r = 3):
   return group;
 }
 
+const shapes = new Map<string, ExtrudeGeometry>();
+
+/**
+ * A flat outline pushed through a thickness, like a part cut from sheet. The
+ * outline is in x-y; the solid runs from z = 0 to z = depth. `holes` are cut
+ * through it. Geometries are shared between parts that ask for the same shape.
+ */
+export function prismGeometry(points: [number, number][], depth: number, holes: [number, number][][] = []): ExtrudeGeometry {
+  const key = `${depth}|${points.join(';')}|${holes.map((hole) => hole.join(';')).join('/')}`;
+  let geometry = shapes.get(key);
+  if (!geometry) {
+    const shape = new Shape();
+    points.forEach(([x, y], i) => (i ? shape.lineTo(x, y) : shape.moveTo(x, y)));
+    shape.closePath();
+    for (const hole of holes) {
+      const path = new Path();
+      hole.forEach(([x, y], i) => (i ? path.lineTo(x, y) : path.moveTo(x, y)));
+      path.closePath();
+      shape.holes.push(path);
+    }
+    geometry = new ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    shapes.set(key, geometry);
+  }
+  return geometry;
+}
+
+export function prism(
+  parent: Object3D,
+  points: [number, number][], depth: number,
+  material: Material,
+  x = 0, y = 0, z = 0,
+  holes: [number, number][][] = [],
+): Mesh {
+  const mesh = new Mesh(prismGeometry(points, depth, holes), material);
+  mesh.position.set(x, y, z);
+  parent.add(mesh);
+  return mesh;
+}
+
+/** Points round a circle, for outlines and holes. */
+export function circle(radius: number, segments = 28, cx = 0, cy = 0): [number, number][] {
+  return Array.from({ length: segments }, (_, i) => {
+    const angle = (i / segments) * Math.PI * 2;
+    return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+  });
+}
+
+/** A square with its corners cut, for plates and frames. */
+export function chamfered(w: number, h: number, cut: number): [number, number][] {
+  const [x, y] = [w / 2, h / 2];
+  return [[-x + cut, -y], [x - cut, -y], [x, -y + cut], [x, y - cut], [x - cut, y], [-x + cut, y], [-x, y - cut], [-x, -y + cut]];
+}
+
+/** A flat ring in the x-y plane, z from 0 to depth. */
+export function ring(parent: Object3D, outer: number, inner: number, depth: number, material: Material, x = 0, y = 0, z = 0): Mesh {
+  // One unit ring per proportion, scaled to size.
+  const ratio = Math.round((inner / outer) * 100) / 100;
+  const mesh = new Mesh(prismGeometry(circle(1, 32), 1, [circle(ratio, 32).reverse()]), material);
+  mesh.scale.set(outer, outer, depth);
+  mesh.position.set(x, y, z);
+  parent.add(mesh);
+  return mesh;
+}
+
+/**
+ * Many copies of one box in a single draw: fins, slats, the slits of a mesh
+ * panel. `place` positions and sizes copy i through the dummy it is given.
+ */
+export function copies(parent: Object3D, count: number, material: Material, place: (dummy: Node3D, i: number) => void): InstancedMesh {
+  const mesh = new InstancedMesh(UNIT_BOX, material, count);
+  const dummy = new Node3D();
+  for (let i = 0; i < count; i++) {
+    dummy.position.set(0, 0, 0);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, 1, 1);
+    place(dummy, i);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingBox();
+  mesh.computeBoundingSphere();
+  parent.add(mesh);
+  return mesh;
+}
+
 let bladeGeometry: ExtrudeGeometry | undefined;
 
 function blade(): ExtrudeGeometry {
@@ -132,10 +285,10 @@ function blade(): ExtrudeGeometry {
     r * Math.sin((deg * Math.PI) / 180),
   ];
   const shape = new Shape();
-  shape.moveTo(...at(0.28, 0));
-  shape.quadraticCurveTo(...at(0.7, 0), ...at(0.98, 20));
-  for (const deg of [28, 36, 44, 52]) shape.lineTo(...at(0.98, deg));
-  shape.quadraticCurveTo(...at(0.7, 50), ...at(0.28, 36));
+  shape.moveTo(...at(0.3, 0));
+  shape.quadraticCurveTo(...at(0.68, -4), ...at(0.97, 16));
+  for (const deg of [24, 32, 40, 48]) shape.lineTo(...at(0.97, deg));
+  shape.quadraticCurveTo(...at(0.7, 46), ...at(0.3, 34));
   shape.closePath();
   bladeGeometry = new ExtrudeGeometry(shape, { depth: 0.03, bevelEnabled: false, curveSegments: 6 });
   bladeGeometry.translate(0, 0, -0.015);
@@ -147,30 +300,38 @@ export interface Fan {
   rotor: Group;
 }
 
-/** A square-framed axial fan lying in the x-y plane, blowing along z. */
-export function fan(parent: Object3D, size: number, thickness: number, blades = 7): Fan {
+/**
+ * An axial fan lying in the x-y plane, blowing along z: a frame with a round
+ * opening and four mounting holes, struts behind, and a hub with swept blades.
+ * `round` gives the frame a circular outline, as some 140 mm fans have.
+ */
+export function fan(parent: Object3D, size: number, thickness: number, blades = 7, round = false): Fan {
   const group = new Group();
-  const bar = size * 0.055;
-  const half = size / 2 - bar / 2;
-  box(group, size, bar, thickness, M.fanFrame, 0, half, 0);
-  box(group, size, bar, thickness, M.fanFrame, 0, -half, 0);
-  box(group, bar, size, thickness, M.fanFrame, half, 0, 0);
-  box(group, bar, size, thickness, M.fanFrame, -half, 0, 0);
-  // Corner webs fill the space between the square frame and the round opening.
-  const web = size * 0.2;
-  const inset = size / 2 - web * 0.42;
-  for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-    const corner = box(group, web, web, thickness, M.fanFrame, sx * inset, sy * inset, 0);
-    corner.rotation.z = Math.PI / 4;
+  const opening = circle(0.47, 36).reverse() as [number, number][];
+  const outlineShape = round ? circle(0.52, 40) : chamfered(1, 1, 0.07);
+  const mounts = round ? [] : [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sy]) => circle(0.022, 10, sx * 0.425, sy * 0.425).reverse() as [number, number][]);
+  // Front and back plates of the frame, joined at the corners.
+  for (const z of [-thickness / 2, thickness / 2 - thickness * 0.16]) {
+    const plate = new Mesh(prismGeometry(outlineShape, 1, [opening, ...mounts]), M.fanFrame);
+    plate.scale.set(size, size, thickness * 0.16);
+    plate.position.z = z;
+    group.add(plate);
+  }
+  if (!round) {
+    for (const [sx, sy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      cyl(group, size * 0.045, thickness * 0.7, M.fanFrame, 'z', sx * size * 0.425, sy * size * 0.425, 0, true);
+    }
   }
   // Stator struts behind the rotor.
-  for (const angle of [Math.PI / 4, -Math.PI / 4]) {
-    const strut = box(group, size * 0.98, size * 0.022, 1.6, M.fanFrame, 0, 0, -thickness / 2 + 1.2);
-    strut.rotation.z = angle;
+  for (let i = 0; i < 4; i++) {
+    const strut = box(group, size * 0.3, size * 0.022, 1.6, M.fanFrame, 0, 0, -thickness / 2 + 2);
+    strut.rotation.z = Math.PI / 4 + (i * Math.PI) / 2;
+    strut.position.set(Math.cos(strut.rotation.z) * size * 0.32, Math.sin(strut.rotation.z) * size * 0.32, -thickness / 2 + 2);
   }
   const rotor = new Group();
   const radius = size * 0.455;
-  cyl(rotor, radius * 0.33, thickness * 0.62, M.fanFrame, 'z');
+  cyl(rotor, radius * 0.32, thickness * 0.6, M.fanFrame, 'z');
+  cyl(rotor, radius * 0.2, 0.6, M.labelDim, 'z', 0, 0, thickness * 0.3 + 0.2);
   for (let i = 0; i < blades; i++) {
     const mesh = new Mesh(blade(), M.fanBlade);
     mesh.scale.setScalar(radius);
@@ -182,10 +343,14 @@ export function fan(parent: Object3D, size: number, thickness: number, blades = 
   return { group, rotor };
 }
 
+/** Turns a shape drawn in x-y and pushed along z into one drawn in y-z and pushed along x. */
+export const ALONG_X = new Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1);
+
 /** A material that can be lit when the machine is powered. */
 export function glowMat(color: number, emissive: number): MeshStandardMaterial {
-  const material = new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0, emissive });
-  material.emissiveIntensity = 0;
+  const material = setBack(new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0, emissive }));
+  glows.set(material, color);
+  setGlow(material, 0);
   return material;
 }
 
@@ -211,6 +376,7 @@ export function tube(
   const segments = Math.max(14, points.length * 9);
   const mesh = new Mesh(new TubeGeometry(curve, segments, radius, RADIAL, false), material);
   mesh.userData.own = true;
+  mesh.userData.noLines = true; // a cable is a dark stroke already
   mesh.userData.segments = segments;
   parent.add(mesh);
   return mesh;
