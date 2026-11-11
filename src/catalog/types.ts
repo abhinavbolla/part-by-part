@@ -1,17 +1,7 @@
 // Catalog schema. All lengths are millimetres, all power figures watts.
 // Every part records the manufacturer page its specs were read from.
 
-export type Category =
-  | 'case'
-  | 'motherboard'
-  | 'cpu'
-  | 'cooler'
-  | 'ram'
-  | 'storage'
-  | 'gpu'
-  | 'psu';
-
-export type FormFactor = 'ATX' | 'mATX' | 'Mini-ITX' | 'E-ATX';
+export type FormFactor = 'E-ATX' | 'ATX' | 'mATX' | 'Mini-ITX';
 export type PsuFormFactor = 'ATX' | 'SFX' | 'SFX-L';
 export type RamType = 'DDR4' | 'DDR5';
 export type StorageInterface = 'nvme' | 'sata';
@@ -25,6 +15,13 @@ interface Base {
   source: string;
 }
 
+/** Fan or radiator sizes by where they mount. */
+export interface ByPosition {
+  front: number[];
+  top: number[];
+  rear: number[];
+}
+
 export interface CasePart extends Base {
   category: 'case';
   /** Outer size: length (front to back), width, height. */
@@ -35,6 +32,11 @@ export interface CasePart extends Base {
   psuFormFactors: PsuFormFactor[];
   maxPsuLength: number;
   expansionSlots: number;
+  /** Sizes of the fans that ship in the box. */
+  includedFans: ByPosition;
+  /** Radiator sizes each position accepts. */
+  radiators: ByPosition;
+  bays: { ssd25: number; hdd35: number };
 }
 
 export interface M2Slot {
@@ -55,6 +57,7 @@ export interface MotherboardPart extends Base {
   pcieX16Slots: number;
   /** 8-pin CPU power sockets on the board. */
   epsConnectors: number;
+  fanHeaders: number;
 }
 
 export interface CpuPart extends Base {
@@ -67,20 +70,32 @@ export interface CpuPart extends Base {
   /** Sustained peak package power, used for the power estimate. */
   peakPower: number;
   igpu: boolean;
-  /** Package outline, used to draw it. */
-  pkg: { w: number; h: number };
 }
 
-export interface CoolerPart extends Base {
+interface CoolerBase extends Base {
   category: 'cooler';
+  sockets: string[];
+  fanSize: number;
+  fans: number;
+}
+
+export interface AirCoolerPart extends CoolerBase {
   kind: 'air';
-  /** Height above the CPU, fan included. */
+  /** Height above the CPU, fans included. */
   height: number;
   width: number;
   depth: number;
-  sockets: string[];
-  fanSize: number;
+  towers: number;
 }
+
+export interface LiquidCoolerPart extends CoolerBase {
+  kind: 'aio';
+  radiator: { size: number; length: number; width: number; thickness: number };
+  /** Pump block height above the CPU. */
+  height: number;
+}
+
+export type CoolerPart = AirCoolerPart | LiquidCoolerPart;
 
 export interface RamPart extends Base {
   category: 'ram';
@@ -93,7 +108,7 @@ export interface RamPart extends Base {
 
 export interface StoragePart extends Base {
   category: 'storage';
-  formFactor: 'M.2';
+  formFactor: 'M.2' | '2.5"';
   length: number;
   interface: StorageInterface;
   capacityGb: number;
@@ -101,6 +116,8 @@ export interface StoragePart extends Base {
 
 export interface GpuPart extends Base {
   category: 'gpu';
+  /** The graphics chip, without the board maker. */
+  chip: string;
   length: number;
   height: number;
   thickness: number;
@@ -118,9 +135,11 @@ export interface PsuPart extends Base {
   wattage: number;
   formFactor: PsuFormFactor;
   length: number;
+  modular: 'full' | 'semi' | 'none';
   connectors: { atx24: number; eps8: number; pcie8: number; hpwr16: number; sata: number };
 }
 
+/** Things bought from the catalog and seated in the case. */
 export type Part =
   | MotherboardPart
   | CpuPart
@@ -130,8 +149,37 @@ export type Part =
   | GpuPart
   | PsuPart;
 
-/** Categories the user installs. The case is the fixed starting point. */
 export type SlotCategory = Part['category'];
+export type Category = SlotCategory | 'case';
+export type CatalogItem = Part | CasePart;
+
+export type CableKind =
+  | 'atx24'
+  | 'eps'
+  | 'gpu'
+  | 'sata'
+  | 'cooler'
+  | 'front';
+
+/**
+ * A cable run. Cables are not catalog items: which ones a build needs follows
+ * from the parts in it. They are steps in the build like any part.
+ */
+export interface CablePart {
+  id: string;
+  category: 'cable';
+  kind: CableKind;
+  name: string;
+  /** What it does, shown under the name. */
+  detail: string;
+  /** Id of the part at the far end, when it has one. */
+  target?: string;
+  /** Needed for the machine to start. */
+  required: boolean;
+}
+
+/** Anything that occupies a step of the build. */
+export type Step = Part | CablePart;
 
 export const SLOT_ORDER: SlotCategory[] = [
   'motherboard',
@@ -143,7 +191,10 @@ export const SLOT_ORDER: SlotCategory[] = [
   'psu',
 ];
 
-export const CATEGORY_LABEL: Record<SlotCategory, string> = {
+export const CATEGORY_ORDER: Category[] = ['case', ...SLOT_ORDER];
+
+export const CATEGORY_LABEL: Record<Category, string> = {
+  case: 'Case',
   motherboard: 'Motherboard',
   cpu: 'Processor',
   cooler: 'CPU cooler',
@@ -152,3 +203,16 @@ export const CATEGORY_LABEL: Record<SlotCategory, string> = {
   gpu: 'Graphics card',
   psu: 'Power supply',
 };
+
+export const CATEGORY_PLURAL: Record<Category, string> = {
+  case: 'Cases',
+  motherboard: 'Motherboards',
+  cpu: 'Processors',
+  cooler: 'CPU coolers',
+  ram: 'Memory',
+  storage: 'Storage',
+  gpu: 'Graphics cards',
+  psu: 'Power supplies',
+};
+
+export const isCable = (step: Step): step is CablePart => step.category === 'cable';

@@ -4,12 +4,16 @@
 
 import {
   BoxGeometry,
+  CatmullRomCurve3,
   CylinderGeometry,
   ExtrudeGeometry,
   Group,
+  InstancedMesh,
   Mesh,
   MeshStandardMaterial,
   Shape,
+  TubeGeometry,
+  Vector3,
   type Material,
   type Object3D,
 } from 'three';
@@ -54,6 +58,10 @@ export const M = {
   label: mat(0xe9e5db, 0.8, 0),
   labelDim: mat(0x9c9a94, 0.8, 0),
   chip: mat(0x0b0c0d, 0.35, 0.1),
+  cable: mat(0x1b1c20, 0.85, 0),
+  cableData: mat(0x2d4460, 0.8, 0),
+  hose: mat(0x121315, 0.7, 0.05),
+  radiator: mat(0x202226, 0.55, 0.4),
 };
 
 export function box(
@@ -188,4 +196,39 @@ export function shadows(root: Object3D): void {
       node.receiveShadow = true;
     }
   });
+}
+
+const RADIAL = 8;
+
+/** A cable or hose through the given points. It can be drawn in from its start. */
+export function tube(
+  parent: Object3D,
+  points: [number, number, number][],
+  radius: number,
+  material: Material,
+): Mesh {
+  const curve = new CatmullRomCurve3(points.map(([x, y, z]) => new Vector3(x, y, z)), false, 'centripetal');
+  const segments = Math.max(14, points.length * 9);
+  const mesh = new Mesh(new TubeGeometry(curve, segments, radius, RADIAL, false), material);
+  mesh.userData.own = true;
+  mesh.userData.segments = segments;
+  parent.add(mesh);
+  return mesh;
+}
+
+/** Shows the first `t` (0..1) of a tube's length. */
+export function reveal(mesh: Mesh, t: number): void {
+  const segments = mesh.userData.segments as number;
+  const shown = Math.round(segments * Math.max(0, Math.min(1, t)));
+  mesh.visible = shown > 0;
+  mesh.geometry.setDrawRange(0, shown * RADIAL * 6);
+}
+
+/** Frees GPU buffers that belong to one model only; shared unit shapes are left alone. */
+export function disposeModel(root: Object3D): void {
+  root.traverse((node) => {
+    if ((node as InstancedMesh).isInstancedMesh) (node as InstancedMesh).dispose();
+    else if ((node as Mesh).isMesh && node.userData.own) (node as Mesh).geometry.dispose();
+  });
+  root.removeFromParent();
 }

@@ -9,8 +9,8 @@
   --bad: #c23c28;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --tray: 304px;
-  --status: 280px;
+  --tray: 344px;
+  --status: 296px;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -43,19 +43,73 @@ h2 {
 }
 button { font: inherit; color: inherit; }
 
-/* Parts tray */
+/* Catalog panel */
 #tray { left: 12px; top: 12px; bottom: 12px; width: var(--tray); display: flex; flex-direction: column; }
-#tray header { padding: 14px 16px 11px; border-bottom: 1px solid var(--line); }
-#tray header p { margin: 2px 0 0; color: var(--mute); font-size: 12px; }
+#tray header { display: flex; align-items: center; gap: 12px; padding: 11px 12px 11px 16px; border-bottom: 1px solid var(--line); }
+#tray .home { color: inherit; text-decoration: none; flex: none; }
+#search {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  font: 13px var(--sans);
+  color: var(--ink);
+  user-select: text;
+  -webkit-user-select: text;
+}
+#search:focus { outline: none; border-color: var(--ink); }
 #tray footer { padding: 9px 16px; border-top: 1px solid var(--line); color: var(--mute); font-size: 12px; }
 .scroll { flex: 1; overflow: auto; padding: 0 8px 10px; overscroll-behavior: contain; }
+.crumbs { margin: 12px 8px 8px; font-size: 12px; color: var(--mute); }
+.crumbs a { color: var(--ink); text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+.crumbs span { margin: 0 6px; color: var(--line); }
+
+.catlink, .hit {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+.catlink:hover, .catlink:focus-visible, .hit:hover, .hit:focus-visible { background: #fff; border-color: var(--line); outline: none; }
+.catlink .txt { flex: 1; }
+.catlink .n { font: 12px var(--mono); color: var(--mute); padding-top: 2px; }
+.cur { display: block; font-size: 12px; color: var(--mute); margin-top: 1px; }
+.cur:empty { display: none; }
+.catlink.in .ico { color: var(--ok); }
+
+.filters { margin: 0 8px 6px; display: grid; gap: 7px; }
+.filters:empty { display: none; }
+.fits { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; }
+.fits input { accent-color: var(--ink); margin: 0; }
+.facet { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.facet .k { margin-right: 3px; }
+.facet button {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.facet button:hover { border-color: var(--ink); }
+.facet button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.none { margin: 14px 8px; color: var(--mute); font-size: 13px; }
+.hint { margin: 2px 8px 8px; padding: 6px 9px; border-radius: 6px; background: #efece4; font-size: 12px; color: var(--mute); }
+
 .card { position: relative; }
 .pick {
   display: flex;
   gap: 10px;
   align-items: flex-start;
   width: 100%;
-  padding: 8px;
+  padding: 8px 64px 8px 8px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: none;
@@ -84,11 +138,11 @@ button { font: inherit; color: inherit; }
 .why:empty { display: none; }
 .card.no .why { color: var(--bad); }
 .card.no .txt b { color: var(--mute); }
-.card.in .pick { background: #fff; border-color: var(--line); cursor: default; padding-right: 74px; }
+.card.in > .pick { background: #fff; border-color: var(--line); cursor: default; }
 .card.in .ico { color: var(--ok); }
 .card.nudge { animation: nudge .32s; }
 @keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-.rm {
+.more, .rm {
   position: absolute;
   right: 8px;
   top: 9px;
@@ -97,23 +151,62 @@ button { font: inherit; color: inherit; }
   border-radius: 6px;
   background: var(--panel);
   font-size: 12px;
+  color: var(--ink);
+  text-decoration: none;
   cursor: pointer;
 }
-.rm:hover { border-color: var(--ink); }
+.more:hover, .rm:hover { border-color: var(--ink); }
+.card.in .more { top: 36px; }
+
+/* A part's own page */
+.detail { margin: 2px 8px 0; }
+.detail .name { font: 600 17px/1.25 var(--sans); letter-spacing: -.01em; text-transform: none; color: var(--ink); margin: 0; }
+.by { margin: 3px 0 12px; color: var(--mute); font-size: 12px; }
+.detail .pick { align-items: center; padding: 10px 12px; border-color: var(--ink); background: var(--ink); color: #fff; }
+.detail .pick:hover { background: #000; }
+.detail .pick .why { color: #fff; opacity: .8; }
+.detail.no .pick { background: none; color: var(--mute); border-color: var(--line); }
+.detail.no .pick .why { color: var(--bad); opacity: 1; }
+.detail.in > .pick { background: #fff; color: var(--ink); border-color: var(--line); }
+.detail .rm { position: static; display: inline-block; margin-top: 8px; }
+.specs { display: grid; grid-template-columns: auto 1fr; gap: 0 14px; margin: 16px 8px 0; font-size: 13px; }
+.specs dt, .specs dd { margin: 0; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.specs dt { color: var(--mute); font-size: 12px; }
+.src { margin: 14px 8px; font-size: 12px; }
+.src a { color: var(--mute); }
 
 /* Build panel */
 #status { right: 12px; top: 12px; width: var(--status); padding: 2px 16px 16px; }
-#status h2 { margin: 14px 0 8px; }
+#status { max-height: calc(100vh - 96px); overflow: auto; overscroll-behavior: contain; }
+#status h2 { margin: 14px 0 8px; display: flex; align-items: center; justify-content: space-between; }
+#plugall {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font: 12px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+#plugall:hover { border-color: var(--ink); }
+.slots a { color: inherit; text-decoration: none; }
+.slots a:hover { text-decoration: underline; }
+.wires { list-style: none; margin: 0 -8px; padding: 0; }
+.wire .pick { padding: 6px 70px 6px 8px; }
+.wire .ico { width: 18px; height: 18px; }
+.wire.in .spec { display: none; }
 .slots, .warn { list-style: none; margin: 0; padding: 0; }
 .slots li {
   display: grid;
-  grid-template-columns: 96px 1fr 20px;
+  grid-template-columns: 92px 1fr 20px;
   align-items: baseline;
   padding: 5px 0;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
 }
-.k { color: var(--mute); font-size: 12px; }
+.k, .slots a.k { color: var(--mute); font-size: 12px; }
 .slots .v { color: var(--mute); }
 .slots .on .v { color: var(--ink); font-weight: 600; }
 .x { border: 0; background: none; padding: 0; color: var(--mute); cursor: pointer; font-size: 15px; line-height: 1; }
@@ -218,15 +311,20 @@ button { font: inherit; color: inherit; }
 }
 [hidden] { display: none !important; }
 
-/* Narrow screens: the tray becomes a strip along the bottom. */
+/* Mid-width windows: slimmer panels leave more room for the case. */
+@media (max-width: 1180px) and (min-width: 861px) {
+  :root { --tray: 296px; --status: 236px; }
+  .slots li { grid-template-columns: 78px 1fr 18px; }
+}
+
+/* Narrow screens: the catalog becomes a strip along the bottom. */
 @media (max-width: 860px) {
-  #tray { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; height: 196px; }
-  #tray header, #tray footer { display: none; }
-  .scroll { display: flex; gap: 4px; padding: 0 8px 8px; }
-  .cat { flex: none; width: 236px; }
-  #status { left: 8px; right: 8px; top: 8px; width: auto; padding: 8px 12px 10px; }
-  #status h2, .slots, .warn { display: none; }
+  #tray { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; height: 236px; }
+  #tray footer { display: none; }
+  #tray header { padding: 8px 10px; }
+  #status { left: 8px; right: 8px; top: 8px; width: auto; padding: 8px 12px 10px; max-height: 40vh; }
+  #status h2, .slots, .warn, .wires { display: none; }
   .load { padding: 0; }
   .power { margin-top: 8px; padding: 7px; }
-  #timeline { left: 8px; right: 8px; bottom: 212px; }
+  #timeline { left: 8px; right: 8px; bottom: 252px; }
 }

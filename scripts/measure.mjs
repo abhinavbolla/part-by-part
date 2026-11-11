@@ -2,13 +2,15 @@
 // interactions on the way. Run `npm run build` first, then `npm run measure`.
 //
 // It serves dist/ the way a CDN would (Brotli, immutable hashed assets), drives
-// the installed Chrome, and prints medians. Options:
+// the installed Chrome with plain mouse and keyboard events, and prints medians.
+// Options:
 //   --runs N       page loads per profile (default 5)
 //   --shots DIR    save screenshots of the build in progress
 //   --headed       show the browser window
+//   --verbose      print every sample
 
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
@@ -23,6 +25,7 @@ const option = (name, fallback) => {
 const RUNS = Number(option('--runs', 5));
 const SHOTS = option('--shots', null);
 const HEADED = args.includes('--headed');
+const VERBOSE = args.includes('--verbose');
 
 if (!existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ is missing. Run `npm run build` first.');
@@ -31,7 +34,12 @@ if (!existsSync(join(DIST, 'index.html'))) {
 
 // ---- a small static server that behaves like the eventual host --------------
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+};
 const compressed = new Map();
 
 function body(path) {
@@ -41,7 +49,8 @@ function body(path) {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost');
-  const path = join(DIST, url.pathname === '/' ? 'index.html' : url.pathname);
+  let path = join(DIST, decodeURIComponent(url.pathname));
+  if (path.startsWith(DIST) && existsSync(path) && statSync(path).isDirectory()) path = join(path, 'index.html');
   if (!path.startsWith(DIST) || !existsSync(path)) {
     response.writeHead(404).end();
     return;
@@ -68,6 +77,7 @@ const quantile = (values, q) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
 };
 const round = (value, digits = 0) => Number(value.toFixed(digits));
+const spread = (values) => `median ${round(median(values), 1)} ms, worst ${round(Math.max(...values), 1)} ms`;
 
 const PROFILES = [
   { name: 'This machine, local', cpu: 1, net: null },
@@ -78,15 +88,18 @@ const PROFILES = [
   },
 ];
 
-const BUILD_ORDER = [
-  'msi-b650-tomahawk-wifi',
-  'amd-ryzen-7-7800x3d',
-  'noctua-nh-u12s',
-  'corsair-vengeance-ddr5-32-6000',
-  'samsung-990-pro-1tb',
-  'corsair-rm750e',
+/** The build the script assembles: [category, part id]. */
+const BUILD = [
+  ['motherboard', 'msi-b650-tomahawk-wifi'],
+  ['cpu', 'amd-ryzen-7-7800x3d'],
+  ['cooler', 'noctua-nh-u12s'],
+  ['ram', 'corsair-vengeance-ddr5-32-6000'],
+  ['storage', 'samsung-990-pro-1tb'],
+  ['storage', 'samsung-870-evo-1tb'],
+  ['psu', 'corsair-rm750e'],
 ];
 const GPU = 'asus-dual-rtx-4070';
+const DEEP_LINK = '/parts/gpu/asus-dual-rtx-4070/';
 
 async function open(browser, profile) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
@@ -107,12 +120,15 @@ async function open(browser, profile) {
       for (const entry of list.getEntries()) window.__long.push(entry.duration);
     }).observe({ type: 'longtask', buffered: true });
   });
-  return { context, page };
+  const errors = [];
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('pageerror', (error) => errors.push(String(error)));
+  return { context, page, errors };
 }
 
-async function loadOnce(browser, profile) {
+async function loadOnce(browser, profile, path) {
   const { context, page } = await open(browser, profile);
-  await page.goto(ORIGIN, { waitUntil: 'load' });
+  await page.goto(ORIGIN + path, { waitUntil: 'load' });
   await page.waitForFunction(() => performance.getEntriesByName('scene-first-frame').length > 0, null, { timeout: 60000 });
   const result = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
@@ -132,36 +148,59 @@ async function loadOnce(browser, profile) {
   return result;
 }
 
+const settled = (page) =>
+  page.waitForFunction(() => window.__pcb.scene()?.stats.settled === true, null, { timeout: 60000 });
+const warmed = (page) =>
+  page.waitForFunction(() => performance.getEntriesByName('scene-warm').length > 0, null, { timeout: 60000 });
+const nextFrame = (page, read) => page.evaluate((source) => new Promise((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve(new Function(`return (${source})`)()())));
+}), read.toString());
+const inputLatency = (page) => nextFrame(page, () => window.__pcb.scene().stats.inputLatency);
+const installed = (page, id) => page.evaluate((part) => window.__pcb.store.isInstalled(part), id);
+
 /**
- * Presses a control with plain mouse events, the way a hand does: move, then
- * press and release. (Playwright's own click() runs extra checks inside the
- * page on first use, which would be counted as the page's latency.)
+ * Presses a control with plain mouse events, the way a hand does: move, pause,
+ * press and release. (Playwright's own click() and scroll helpers run extra
+ * checks inside the page on first use, which would be counted as the page's
+ * latency.) `pause` is how long the pointer rests on it first.
  */
-async function press(page, selector) {
+async function press(page, selector, pause = 80) {
   const box = await page.evaluate((query) => {
     const element = document.querySelector(query);
+    if (!element) return null;
     element.scrollIntoView({ block: 'nearest' });
     const rect = element.getBoundingClientRect();
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   }, selector);
-  await page.mouse.move(box.x + Math.min(60, box.width / 2), box.y + Math.min(20, box.height / 2));
-  await page.waitForTimeout(60);
+  if (!box) throw new Error(`nothing matches ${selector}`);
+  await page.mouse.move(box.x + Math.min(60, box.width / 2), box.y + Math.min(18, box.height / 2));
+  if (pause) await page.waitForTimeout(pause);
   await page.mouse.down();
   await page.mouse.up();
 }
 
-const settled = (page) =>
-  page.waitForFunction(() => window.__pcb.scene()?.stats.settled === true, null, { timeout: 30000 });
+/** Follows a catalog link and returns the time from click to the new page being on screen. */
+async function follow(page, selector, expect, pause = 80) {
+  await page.evaluate(() => { window.__pcb.router.lastSwap = null; });
+  await press(page, selector, pause);
+  await page.waitForSelector(expect, { timeout: 30000 });
+  await page.waitForFunction(() => window.__pcb.router.lastSwap !== null, null, { timeout: 30000 });
+  return page.evaluate(() => window.__pcb.router.lastSwap);
+}
 
 async function interact(browser, profile) {
-  const { context, page } = await open(browser, profile);
+  const { context, page, errors } = await open(browser, profile);
   const failures = [];
   const expect = (condition, label) => { if (!condition) failures.push(label); };
+  let shot = 0;
+  const snap = async (label) => {
+    if (SHOTS) await page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-${label}.png`) });
+  };
+
   await page.goto(ORIGIN, { waitUntil: 'load' });
-  await page.waitForFunction(() => performance.getEntriesByName('scene-warm').length > 0, null, { timeout: 30000 });
+  await warmed(page);
   await settled(page);
   const warmAt = await page.evaluate(() => performance.getEntriesByName('scene-warm')[0].startTime);
-
   const renderer = await page.evaluate(() => {
     const gl = document.createElement('canvas').getContext('webgl2');
     const info = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -175,77 +214,144 @@ async function interact(browser, profile) {
     return window.__pcb.scene().stats.rendered - before;
   });
 
-  // Click each part in; time from the click to the first frame that answers it.
+  // Browse to each part and click it in.
   await page.evaluate(() => { window.__pcb.scene().stats.frames.length = 0; });
-  const latencies = [];
-  let shot = 0;
-  for (const id of BUILD_ORDER) {
+  const swaps = [];
+  const clicks = [];
+  for (const [category, id] of BUILD) {
+    swaps.push(await follow(page, `.catlink[data-cat="${category}"]`, `.card[data-id="${id}"]`));
+    await page.waitForFunction((part) => window.__pcb.resolve(part) != null, id);
+    await page.waitForTimeout(350); // let the category's parts warm up, as they would while a person reads
     await press(page, `.card[data-id="${id}"] .pick`);
-    latencies.push(await page.evaluate(() => new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.__pcb.scene().stats.inputLatency)));
-    })));
+    clicks.push(await inputLatency(page));
     if (SHOTS) {
-      for (const delay of [500, 600, 600]) {
-        await page.waitForTimeout(delay);
-        await page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-${id}.png`) });
-      }
+      await page.waitForTimeout(700);
+      await snap(id);
     }
     await settled(page);
-    expect(await page.evaluate((part) => window.__pcb.store.isInstalled(part), id), `click installs ${id}`);
+    expect(await installed(page, id), `click installs ${id}`);
+    swaps.push(await follow(page, '.crumbs a[href="/"]', '.catlink'));
   }
   const buildFrames = await page.evaluate(() => [...window.__pcb.scene().stats.frames]);
+  const slowFrames = await page.evaluate(() => window.__pcb.scene().stats.slow.splice(0));
+
+  // A part page clicked with no pause on its link: the fetch starts with the click.
+  await follow(page, '.catlink[data-cat="gpu"]', '.card[data-id="asus-dual-rtx-4070"]');
+  const coldSwap = await follow(page, '.card[data-id="sapphire-pulse-rx-7800-xt-16gb"] .more', '.detail[data-id="sapphire-pulse-rx-7800-xt-16gb"]', 0);
+  await follow(page, '.crumbs a[href="/parts/gpu/"]', '.card[data-id="asus-dual-rtx-4070"]');
+
+  // Filters: "only what fits" hides the card that is too long for this case.
+  const before = await page.locator('.rows .card:not([hidden])').count();
+  await press(page, '#fits');
+  const after = await page.locator('.rows .card:not([hidden])').count();
+  expect(after < before && after > 0, `fits filter narrows the list (${before} -> ${after})`);
+  expect(await page.isHidden('.card[data-id="asus-rog-strix-rtx-4090"]'), 'the too-long card is filtered out');
+  await press(page, '.facet button[data-v="Radeon"]');
+  expect(await page.isHidden(`.card[data-id="${GPU}"]`), 'chip filter hides GeForce cards');
+  await press(page, '.facet button[data-v="Radeon"]');
+  await press(page, '#fits');
 
   // A part that does not fit is refused, with the reason shown.
-  await page.click('.card[data-id="intel-core-i5-14600k"] .pick');
-  await page.waitForTimeout(200);
-  expect(!(await page.evaluate(() => window.__pcb.store.isInstalled('intel-core-i5-14600k'))), 'second CPU is refused');
+  await press(page, '.card[data-id="asus-rog-strix-rtx-4090"] .pick');
+  await page.waitForTimeout(250);
+  expect(!(await installed(page, 'asus-rog-strix-rtx-4090')), 'the too-long card is refused');
   expect(await page.isVisible('#notice'), 'refusal shows a notice');
-  if (SHOTS) await page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-rejected.png`) });
+  await snap('rejected');
   await settled(page);
 
-  // Drag the graphics card from the tray to its slot.
-  const pick = page.locator(`.card[data-id="${GPU}"] .pick`);
-  await pick.scrollIntoViewIfNeeded();
-  const card = await pick.boundingBox();
+  // Drag the graphics card from the list to its slot.
+  const card = await page.evaluate((id) => {
+    const element = document.querySelector(`.card[data-id="${id}"] .pick`);
+    element.scrollIntoView({ block: 'nearest' });
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y };
+  }, GPU);
   await page.mouse.move(card.x + 40, card.y + 20);
   await page.mouse.down();
   await page.mouse.move(card.x + 80, card.y + 30, { steps: 4 });
   const slot = await page.evaluate(() => window.__pcb.scene().ghostScreen());
   await page.mouse.move(slot.x, slot.y + 40, { steps: 24 });
-  if (SHOTS) await page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-dragging.png`) });
+  await snap('dragging');
   await page.mouse.up();
-  const dropLatency = await page.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.__pcb.scene().stats.inputLatency)));
-  }));
-  expect(await page.evaluate((id) => window.__pcb.store.isInstalled(id), GPU), 'drag and drop installs the graphics card');
+  const dropLatency = await inputLatency(page);
+  expect(await installed(page, GPU), 'drag and drop installs the graphics card');
   await settled(page);
-  if (SHOTS) await page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-built.png`) });
 
-  // Undo, redo, remove.
-  await page.click('#undo');
+  // Wiring: plug everything in.
+  const wires = await page.locator('.wire').count();
+  expect(wires === 6, `six cables are listed (got ${wires})`);
+  expect(!(await page.isEnabled('#power')), 'power stays off until the cables are in');
+  await press(page, '#plugall');
+  await page.waitForTimeout(600);
+  await snap('wiring');
   await settled(page);
-  expect(!(await page.evaluate((id) => window.__pcb.store.isInstalled(id), GPU)), 'undo takes the last part out');
-  await page.click('#redo');
+  expect((await page.locator('.wire.in').count()) === wires, 'all cables plug in');
+  await snap('built');
+
+  // Undo, redo, and a part that something depends on.
+  await press(page, '#undo');
   await settled(page);
-  expect(await page.evaluate((id) => window.__pcb.store.isInstalled(id), GPU), 'redo puts it back');
-  await page.click('.card[data-id="amd-ryzen-7-7800x3d"] .rm');
-  expect(await page.evaluate(() => window.__pcb.store.isInstalled('amd-ryzen-7-7800x3d')), 'CPU under a cooler cannot be removed');
+  expect(!(await installed(page, 'cable-front')), 'undo takes the last step out');
+  await press(page, '#redo');
   await settled(page);
+  expect(await installed(page, 'cable-front'), 'redo puts it back');
+  await press(page, '.slots [data-remove="amd-ryzen-7-7800x3d"]');
+  expect(await installed(page, 'amd-ryzen-7-7800x3d'), 'a CPU under a cooler cannot be removed');
+
+  // Search.
+  await page.click('#search');
+  await page.keyboard.type('990');
+  await page.waitForSelector('.hit');
+  expect((await page.locator('.hit').count()) === 1, 'search finds the 990 Pro');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.detail[data-id="samsung-990-pro-1tb"]');
+  expect(await page.evaluate(() => location.pathname) === '/parts/storage/samsung-990-pro-1tb/', 'search opens the part page');
+  await page.goBack();
+  await page.waitForSelector('.card[data-id="asus-dual-rtx-4070"]');
+
+  // The build survives a reload and comes back without replaying.
+  const steps = await page.evaluate(() => window.__pcb.store.cursor);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => window.__pcb?.scene() != null);
+  await settled(page);
+  expect(await page.evaluate(() => window.__pcb.store.cursor) === steps, `reload restores ${steps} steps`);
+  expect(await page.isEnabled('#power'), 'power button is enabled for a complete, wired build');
 
   // Power on and watch the frame rate with fans spinning.
-  expect(await page.isEnabled('#power'), 'power button is enabled for a complete build');
   await page.evaluate(() => { window.__pcb.scene().stats.frames.length = 0; });
-  await page.click('#power');
+  await press(page, '#power');
   await page.waitForTimeout(3000);
   const poweredFrames = await page.evaluate(() => [...window.__pcb.scene().stats.frames]);
-  if (SHOTS) await page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-powered.png`) });
+  await snap('powered');
   const scene = await page.evaluate(() => {
     const { drawCalls, triangles } = window.__pcb.scene().stats;
     return { drawCalls, triangles };
   });
-
   await context.close();
-  return { renderer, idle, latencies, dropLatency, buildFrames, poweredFrames, scene, failures, warmAt };
+
+  // A different case, a small board and a liquid cooler, in a fresh window.
+  const second = await open(browser, profile);
+  await second.page.goto(`${ORIGIN}/parts/case/`, { waitUntil: 'load' });
+  await warmed(second.page);
+  await press(second.page, '.card[data-id="lian-li-lancool-216"] .pick');
+  expect(await second.page.evaluate(() => window.__pcb.store.pcCase.id) === 'lian-li-lancool-216', 'the case can be changed');
+  for (const [category, id] of [
+    ['motherboard', 'asus-rog-strix-b650e-i-gaming-wifi'],
+    ['cpu', 'amd-ryzen-5-7600'],
+    ['cooler', 'arctic-liquid-freezer-iii-360'],
+  ]) {
+    await follow(second.page, '.crumbs a[href="/"]', '.catlink');
+    await follow(second.page, `.catlink[data-cat="${category}"]`, `.card[data-id="${id}"]`);
+    await second.page.waitForFunction((part) => window.__pcb.resolve(part) != null, id);
+    await press(second.page, `.card[data-id="${id}"] .pick`);
+    await settled(second.page);
+    expect(await installed(second.page, id), `second build installs ${id}`);
+  }
+  if (SHOTS) await second.page.screenshot({ path: join(SHOTS, `${String(shot++).padStart(2, '0')}-second-build.png`) });
+  await second.context.close();
+
+  expect(errors.length + second.errors.length === 0, `no console errors (${[...errors, ...second.errors].slice(0, 3).join(' | ')})`);
+  return { renderer, idle, swaps, coldSwap, clicks, dropLatency, buildFrames, slowFrames, poweredFrames, scene, failures, warmAt };
 }
 
 // ---- run -------------------------------------------------------------------
@@ -257,43 +363,67 @@ const browser = await chromium.launch({
   args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal'],
 });
 
-const assets = readdirSync(join(DIST, 'assets')).map((name) => `assets/${name}`);
-console.log('\nBundle (bytes on disk / gzip / Brotli)');
-for (const file of ['index.html', ...assets]) {
+const size = (file) => {
   const raw = readFileSync(join(DIST, file));
-  console.log(`  ${file.padEnd(34)} ${String(raw.length).padStart(7)} ${String(gzipSync(raw).length).padStart(7)} ${String(brotliCompressSync(raw).length).padStart(7)}`);
+  return `${String(raw.length).padStart(7)} ${String(gzipSync(raw).length).padStart(7)} ${String(brotliCompressSync(raw).length).padStart(7)}`;
+};
+console.log('\nFiles (bytes on disk / gzip / Brotli)');
+for (const file of [
+  'index.html',
+  ...readdirSync(join(DIST, 'assets')).map((name) => `assets/${name}`),
+  'parts/gpu/index.html',
+  'parts/gpu/panel.html',
+  'data/gpu.json',
+  'data/index.json',
+]) {
+  console.log(`  ${file.padEnd(34)} ${size(file)}`);
 }
+const countFiles = (dir) => readdirSync(dir, { withFileTypes: true })
+  .reduce((sum, entry) => sum + (entry.isDirectory() ? countFiles(join(dir, entry.name)) : entry.name === 'index.html' ? 1 : 0), 0);
+console.log(`  ${countFiles(DIST)} pre-rendered pages`);
 
 let failed = false;
 for (const profile of PROFILES) {
-  const loads = [];
-  for (let i = 0; i < RUNS; i++) loads.push(await loadOnce(browser, profile));
-  const pick = (key) => median(loads.map((load) => load[key]));
+  const home = [];
+  const deep = [];
+  for (let i = 0; i < RUNS; i++) {
+    home.push(await loadOnce(browser, profile, '/'));
+    deep.push(await loadOnce(browser, profile, DEEP_LINK));
+  }
+  const pick = (loads, key) => median(loads.map((load) => load[key]));
   const run = await interact(browser, profile);
   const frames = (values) =>
     `p50 ${round(quantile(values, 0.5), 1)} ms, p95 ${round(quantile(values, 0.95), 1)} ms, worst ${round(Math.max(0, ...values), 1)} ms, ${values.filter((ms) => ms > 20).length} of ${values.length} over 20 ms`;
 
   console.log(`\n${profile.name}  (median of ${RUNS} cold loads)`);
-  console.log(`  WebGL renderer          ${run.renderer}`);
-  console.log(`  first byte              ${round(pick('ttfb'))} ms`);
-  console.log(`  first contentful paint  ${round(pick('fcp'))} ms`);
-  console.log(`  largest contentful paint ${round(pick('lcp'))} ms`);
-  console.log(`  first 3D frame          ${round(pick('firstFrame'))} ms`);
-  console.log(`  transferred             ${round(pick('bytes') / 1024, 1)} KB in ${pick('requests')} requests`);
-  console.log(`  all parts ready         ${round(run.warmAt)} ms`);
-  console.log(`  long tasks during load  ${pick('longTasks')} (longest ${round(pick('longest'))} ms)`);
-  console.log(`  click to first frame    median ${round(median(run.latencies), 1)} ms, worst ${round(Math.max(...run.latencies), 1)} ms (${run.latencies.length} clicks)`);
-  if (args.includes('--verbose')) console.log(`    each click: ${run.latencies.map((ms) => round(ms, 1)).join(', ')} ms`);
-  console.log(`  drop to first frame     ${round(run.dropLatency, 1)} ms`);
-  console.log(`  frames while building   ${frames(run.buildFrames)}`);
-  console.log(`  frames while powered on ${frames(run.poweredFrames)}`);
-  console.log(`  frames drawn while idle ${run.idle} in 1.5 s`);
-  console.log(`  scene                   ${run.scene.drawCalls} draw calls, ${run.scene.triangles} triangles`);
+  console.log(`  WebGL renderer            ${run.renderer}`);
+  console.log(`  home: first byte          ${round(pick(home, 'ttfb'))} ms`);
+  console.log(`  home: first paint         ${round(pick(home, 'fcp'))} ms`);
+  console.log(`  home: largest paint       ${round(pick(home, 'lcp'))} ms`);
+  console.log(`  home: first 3D frame      ${round(pick(home, 'firstFrame'))} ms`);
+  console.log(`  home: transferred         ${round(pick(home, 'bytes') / 1024, 1)} KB in ${pick(home, 'requests')} requests`);
+  console.log(`  home: long tasks          ${pick(home, 'longTasks')} (longest ${round(pick(home, 'longest'))} ms)`);
+  console.log(`  part page: first paint    ${round(pick(deep, 'fcp'))} ms`);
+  console.log(`  part page: first 3D frame ${round(pick(deep, 'firstFrame'))} ms`);
+  console.log(`  part page: transferred    ${round(pick(deep, 'bytes') / 1024, 1)} KB in ${pick(deep, 'requests')} requests`);
+  console.log(`  category page swap        ${spread(run.swaps)} (${run.swaps.length} links)`);
+  console.log(`  part page swap, unhovered ${round(run.coldSwap, 1)} ms`);
+  console.log(`  click to first frame      ${spread(run.clicks)} (${run.clicks.length} clicks)`);
+  if (VERBOSE) {
+    console.log(`    swaps:  ${run.swaps.map((ms) => round(ms, 1)).join(', ')}`);
+    console.log(`    clicks: ${run.clicks.map((ms) => round(ms, 1)).join(', ')}`);
+    console.log(`    slow frames while building (timeline position: ms): ${run.slowFrames.map((item) => `${item.at}: ${item.ms}`).join(', ') || 'none'}`);
+  }
+  console.log(`  drop to first frame       ${round(run.dropLatency, 1)} ms`);
+  console.log(`  frames while building     ${frames(run.buildFrames)}`);
+  console.log(`  frames while powered on   ${frames(run.poweredFrames)}`);
+  console.log(`  frames drawn while idle   ${run.idle} in 1.5 s`);
+  console.log(`  scene, fully built        ${run.scene.drawCalls} draw calls, ${run.scene.triangles} triangles`);
   if (run.failures.length) {
     failed = true;
-    console.log(`  FAILED CHECKS: ${run.failures.join('; ')}`);
+    console.log(`  FAILED CHECKS:\n    ${run.failures.join('\n    ')}`);
   } else {
-    console.log('  interaction checks      all passed');
+    console.log('  interaction checks        all passed');
   }
 }
 
