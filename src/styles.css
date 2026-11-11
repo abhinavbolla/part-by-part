@@ -73,7 +73,7 @@ h2 { font-size: 12px; font-weight: 600; margin: 16px 8px 8px; letter-spacing: -.
 .crumbs span { margin: 0 7px; color: var(--faint); }
 
 /* Home: a sheet of category cards */
-.cats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 8px; }
+.cats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 8px; }
 .catlink {
   position: relative;
   display: flex;
@@ -90,7 +90,7 @@ h2 { font-size: 12px; font-weight: 600; margin: 16px 8px 8px; letter-spacing: -.
 .catlink .shot { width: 72px; height: 56px; border: 0; place-items: center start; }
 .catlink .shot .ico { width: 26px; height: 26px; color: var(--ink-2); }
 .catlink { gap: 8px; }
-.catlink .txt b { font-weight: 600; }
+.catlink .txt b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .catlink .n { position: absolute; right: 12px; top: 12px; font: 11px var(--mono); color: var(--faint); }
 .cur { display: block; font-size: 12px; color: var(--mute); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cur:empty::before { content: "none yet"; color: var(--faint); }
@@ -360,7 +360,7 @@ h2 { font-size: 12px; font-weight: 600; margin: 16px 8px 8px; letter-spacing: -.
   #tray { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; height: 244px; }
   #tray footer { display: none; }
   #tray header { padding: 8px 10px; }
-  .cats { grid-template-columns: repeat(4, 1fr); }
+  .cats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .catlink { min-height: 84px; gap: 10px; padding: 10px; }
   #status { left: 8px; right: 8px; top: 8px; width: auto; padding: 8px 12px 10px; max-height: 40vh; }
   #status h2, .slots, .warn, .wires { display: none; }
