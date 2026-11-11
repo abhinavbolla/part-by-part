@@ -188,6 +188,32 @@ async function follow(page, selector, expect, pause = 80) {
   return page.evaluate(() => window.__pcb.router.lastSwap);
 }
 
+/**
+ * How often this browser draws a frame when the page does nothing costly.
+ * Normally 16.7 ms; on battery in Low Power Mode Chrome halves it to 33.3 ms,
+ * and then no page can be shown to be smoother than that.
+ */
+async function frameInterval(browser) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto('data:text/html,<body><i id=a style="display:block;width:9px;height:9px;background:%23000"></i></body>');
+  const interval = await page.evaluate(() => new Promise((resolve) => {
+    const times = [];
+    let last = 0;
+    let count = 0;
+    const tick = (now) => {
+      if (last) times.push(now - last);
+      last = now;
+      document.getElementById('a').style.marginLeft = `${count % 40}px`;
+      if (++count < 90) requestAnimationFrame(tick);
+      else resolve(times.sort((a, b) => a - b)[Math.floor(times.length / 2)]);
+    };
+    requestAnimationFrame(tick);
+  }));
+  await context.close();
+  return interval;
+}
+
 async function interact(browser, profile) {
   const { context, page, errors } = await open(browser, profile);
   const failures = [];
@@ -382,6 +408,10 @@ const countFiles = (dir) => readdirSync(dir, { withFileTypes: true })
   .reduce((sum, entry) => sum + (entry.isDirectory() ? countFiles(join(dir, entry.name)) : entry.name === 'index.html' ? 1 : 0), 0);
 console.log(`  ${countFiles(DIST)} pre-rendered pages`);
 
+const beat = await frameInterval(browser);
+console.log(`\nBrowser frame interval: ${round(beat, 1)} ms${beat > 20 ? '  (capped: the machine is saving power, so frame figures below cannot show 60 fps)' : ''}`);
+const late = beat * 1.25;
+
 let failed = false;
 for (const profile of PROFILES) {
   const home = [];
@@ -393,7 +423,7 @@ for (const profile of PROFILES) {
   const pick = (loads, key) => median(loads.map((load) => load[key]));
   const run = await interact(browser, profile);
   const frames = (values) =>
-    `p50 ${round(quantile(values, 0.5), 1)} ms, p95 ${round(quantile(values, 0.95), 1)} ms, worst ${round(Math.max(0, ...values), 1)} ms, ${values.filter((ms) => ms > 20).length} of ${values.length} over 20 ms`;
+    `p50 ${round(quantile(values, 0.5), 1)} ms, p95 ${round(quantile(values, 0.95), 1)} ms, worst ${round(Math.max(0, ...values), 1)} ms, ${values.filter((ms) => ms > late).length} of ${values.length} late`;
 
   console.log(`\n${profile.name}  (median of ${RUNS} cold loads)`);
   console.log(`  WebGL renderer            ${run.renderer}`);

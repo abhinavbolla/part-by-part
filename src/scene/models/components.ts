@@ -51,7 +51,7 @@ export function buildCpu(part: CpuPart, bl: BoardLayout, fx: Fixtures): PartMode
 /** A stack of fins standing on the cooler base, heat pipes through it. */
 function finStack(parent: Object3D, depth: number, width: number, height: number, x: number): void {
   const base = 34;
-  const pitch = 2.3;
+  const pitch = 4;
   const count = Math.floor((height - 4 - base) / pitch);
   const fins = new InstancedMesh(UNIT_BOX, M.alu, count);
   const dummy = new Object3D();

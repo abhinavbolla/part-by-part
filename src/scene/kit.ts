@@ -5,6 +5,7 @@
 import {
   BoxGeometry,
   CatmullRomCurve3,
+  Color,
   CylinderGeometry,
   ExtrudeGeometry,
   Group,
@@ -23,11 +24,27 @@ const UNIT_BOX = new BoxGeometry(1, 1, 1);
 const UNIT_CYL = new CylinderGeometry(1, 1, 1, 24);
 const UNIT_CYL_LOW = new CylinderGeometry(1, 1, 1, 10);
 const rounded = new Map<string, RoundedBoxGeometry>();
+const accentColor = new Color(0xff5a1f);
 
 export { UNIT_BOX };
 
+/**
+ * Makes a material also write its surface normal to a second output. The
+ * line-drawing look reads plates and normals from one pass over the scene
+ * instead of drawing everything twice; elsewhere the extra output is ignored.
+ */
+function withNormalOutput(material: MeshStandardMaterial): MeshStandardMaterial {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'layout(location = 1) out highp vec4 gNormal;\nvoid main() {')
+      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgNormal = vec4(normal * 0.5 + 0.5, 1.0);');
+  };
+  material.customProgramCacheKey = () => 'normal-output';
+  return material;
+}
+
 export function mat(color: number, roughness = 0.6, metalness = 0): MeshStandardMaterial {
-  return new MeshStandardMaterial({ color, roughness, metalness });
+  return withNormalOutput(new MeshStandardMaterial({ color, roughness, metalness }));
 }
 
 /** Shared palette. Parts that light up get their own material instead. */
@@ -63,6 +80,57 @@ export const M = {
   hose: mat(0x121315, 0.7, 0.05),
   radiator: mat(0x202226, 0.55, 0.4),
 };
+
+export type Look = 'drawing' | 'shaded';
+
+/** Fills for the line-drawing look: near-white plates in a few greys, dark cables. */
+const DRAWN: Record<keyof typeof M, number> = {
+  caseOuter: 0xfcfcfc, caseInner: 0xf4f4f5, vent: 0xe4e4e7, pcb: 0xe7e7ea, substrate: 0xdddde1,
+  heatsink: 0xffffff, heatsinkDark: 0xeeeef0, slot: 0xd6d6da, slotAlt: 0xe6e6e9, steel: 0xffffff,
+  gold: 0xf3f1ea, copper: 0xf2eee9, alu: 0xffffff, fanFrame: 0xebebee, fanBlade: 0xf7f7f8,
+  brass: 0xf1eee5, screw: 0xffffff, black: 0xd2d2d7, ramBlack: 0xdcdce0, ramGrey: 0xeeeef1,
+  gpuShroud: 0xe5e5e9, gpuBack: 0xf5f5f7, psu: 0xe2e2e6, label: 0xffffff, labelDim: 0xf8f8f9,
+  chip: 0xcbcbd1, cable: 0x3f3f46, cableData: 0x5b6474, hose: 0x3f3f46, radiator: 0xdedee2,
+};
+
+/** The one highlight colour of the drawing look: whatever is lit. */
+export const ACCENT = 0xff5a1f;
+
+const SHADED = Object.fromEntries(
+  Object.entries(M).map(([key, material]) => [
+    key,
+    { color: material.color.getHex(), roughness: material.roughness, metalness: material.metalness },
+  ]),
+) as Record<keyof typeof M, { color: number; roughness: number; metalness: number }>;
+
+/** Materials that light up, with the colour they rest at in the shaded look. */
+const glows = new Map<MeshStandardMaterial, number>();
+let look: Look = 'shaded';
+
+/** Switches every shared material between flat drawing fills and shaded surfaces. */
+export function setLook(next: Look): void {
+  look = next;
+  for (const key of Object.keys(M) as (keyof typeof M)[]) {
+    const material = M[key];
+    const shaded = SHADED[key];
+    material.color.setHex(next === 'drawing' ? DRAWN[key] : shaded.color);
+    material.roughness = next === 'drawing' ? 1 : shaded.roughness;
+    material.metalness = next === 'drawing' ? 0 : shaded.metalness;
+  }
+  for (const material of glows.keys()) setGlow(material, 0);
+}
+
+/** Lights a glow material by `amount` (0..1) in whichever way the current look shows light. */
+export function setGlow(material: MeshStandardMaterial, amount: number): void {
+  const rest = glows.get(material) ?? 0xffffff;
+  if (look === 'drawing') {
+    material.emissiveIntensity = 0;
+    material.color.setHex(0xffffff).lerp(accentColor, Math.min(1, amount));
+  } else {
+    material.color.setHex(rest);
+    material.emissiveIntensity = amount * 1.4;
+  }
+}
 
 export function box(
   parent: Object3D,
@@ -184,8 +252,9 @@ export function fan(parent: Object3D, size: number, thickness: number, blades = 
 
 /** A material that can be lit when the machine is powered. */
 export function glowMat(color: number, emissive: number): MeshStandardMaterial {
-  const material = new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0, emissive });
-  material.emissiveIntensity = 0;
+  const material = withNormalOutput(new MeshStandardMaterial({ color, roughness: 0.4, metalness: 0, emissive }));
+  glows.set(material, color);
+  setGlow(material, 0);
   return material;
 }
 

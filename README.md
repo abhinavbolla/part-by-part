@@ -34,6 +34,9 @@ come together.
   card length (less a front radiator) and slot width, cooler height and socket,
   radiator mounts, M.2 slot count, length and SATA support, drive mounts, power
   supply size, connectors and wattage, and a display output.
+- **Two looks:** the build is drawn as an isometric line drawing by default,
+  and a switch on the timeline shows it shaded instead. Every part in the
+  catalog gets its own small drawing, made in the browser from the same model.
 - **Your build is kept** in the browser and comes back after a reload.
 - **Power on** once it is complete and wired: fans spin, lights come on.
 
@@ -74,31 +77,48 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
   grows.
 - **Idle means idle.** The scene draws a frame only when something moves, and
   shaders and parts are prepared while the page is idle.
+- **The drawing comes from the picture, not from each shape.** The scene is
+  rendered once into flat plates, depth and surface normals; a second pass
+  draws a dark line where depth jumps (an outline) and a lighter one where a
+  surface turns (a crease). Any part, however it is modelled, is outlined the
+  same way (`src/scene/drawing.ts`). The style takes its cue from
+  [hairline](https://github.com/lucasmarkes/hairline) by Lucas Markes; none of
+  its code is used.
+- **Nothing shifts.** The box for a part's drawing is sized in the HTML before
+  the drawing exists, so lists do not move when drawings arrive.
 
 Dependencies: `three` at runtime; Vite, TypeScript and `playwright-core` (for
 `npm run measure`, using the installed Chrome) for development.
 
 ## Measured
 
-`npm run measure`, 11 November 2026, Apple M4, Chrome, production build served
-with Brotli. Medians of five cold loads; interaction figures from a scripted
-build of 14 steps driven with real mouse events.
+`npm run measure`, 11 November 2026 (evening, after the redesign), Apple M4,
+Chrome, production build served with Brotli. Medians of five cold loads;
+interaction figures from a scripted build of 14 steps driven with real mouse
+events. **The Mac was on battery in Low Power Mode for this run**, which makes
+everything somewhat slower than a plugged-in run and caps Chrome at 30 frames
+a second, so smoothness at 60 fps could not be shown this time.
 
 | | This machine | 4x slower CPU, Fast 4G |
 |---|---|---|
-| Home: first paint | 60 ms | 312 ms |
-| Home: first 3D frame | 161 ms | 812 ms |
-| A part's page opened directly: first paint | 68 ms | 312 ms |
-| Category page swap (median / worst) | 16.6 / 18.5 ms | 30.1 / 103.7 ms |
-| Part page swap, link not hovered first | 8.2 ms | 204.5 ms |
-| Click to first animation frame (median / worst) | 6.1 / 17.8 ms | 23.9 / 34.4 ms |
-| Frames over 20 ms while building | 0 of 918 | 3 of 915 |
+| Home: first paint | 64 ms | 388 ms |
+| Home: first 3D frame | 114 ms | 1067 ms |
+| A part's page opened directly: first paint | 64 ms | 356 ms |
+| Category page swap (median / worst) | 17.7 / 34.8 ms | 61.6 / 155.5 ms |
+| Part page swap, link not hovered first | 20.8 ms | 231.9 ms |
+| Click to first animation frame (median / worst) | 14.5 / 32.9 ms | 28 / 50.9 ms |
+| Late frames while building (frame interval 33.3 ms) | 1 of 459 | 0 of 461 |
 | Frames drawn while idle | 0 | 0 |
-| Transferred on first load | 139 KB, 3 requests | 139 KB, 3 requests |
+| Transferred on first load | 142 KB, 3 requests | 142 KB, 3 requests |
 
-The throttled column slows the CPU and network only; the GPU is still this
-machine's. Nothing has been measured on a phone or a low-end laptop, and only
-Chrome has been run.
+Cost of one frame of a fully built machine, CPU and GPU together, timed by
+forcing the GPU to finish: 11.2 ms for the line drawing and 11.3 ms shaded at
+2880 x 1800, also in Low Power Mode. Both fit a 16.7 ms frame.
+
+The previous run, plugged in and before the redesign, measured 0 of 918 frames
+over 20 ms at 60 fps. The throttled column slows the CPU and network only; the
+GPU is still this machine's. Nothing has been measured on a phone or a low-end
+laptop, and only Chrome has been run.
 
 ## Parts data
 

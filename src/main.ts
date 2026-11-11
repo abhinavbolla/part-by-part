@@ -3,7 +3,7 @@
 // so the page is readable and clickable before any 3D code has arrived.
 
 import { BuildStore } from './build/store.ts';
-import { loadCategory, peek, remember, searchIndex, type SearchEntry } from './catalog/client.ts';
+import { itemsOf, loadCategory, peek, remember, searchIndex, type SearchEntry } from './catalog/client.ts';
 import type { CasePart, CatalogItem, Category, Step } from './catalog/types.ts';
 import { CATEGORY_LABEL, CATEGORY_ORDER, isCable } from './catalog/types.ts';
 import { isBlocked, isMisfit } from './rules/compat.ts';
@@ -29,6 +29,7 @@ const callout = el('callout');
 const chip = el('chip');
 const notice = el('notice');
 const hud = el('hud');
+const lookButton = el<HTMLButtonElement>('look');
 
 const SAVE_KEY = 'pc-builder:build';
 const boot = JSON.parse(el('boot').textContent ?? '{}') as { case: CasePart };
@@ -71,7 +72,9 @@ const sceneReady = import('./scene/scene.ts').then((module) => {
   scene.warmShaders(() => {
     refresh();
     fetchCategoriesAhead();
+    drawPictures();
   });
+  lookButton.textContent = scene.look === 'drawing' ? 'Shaded' : 'Drawing';
   scene.warm(store.steps);
   warmCategory(categoryOf(location.pathname));
   return scene;
@@ -89,7 +92,12 @@ function fetchCategoriesAhead(): void {
   const next = (): void => {
     const category = queue.shift();
     if (!category) return;
-    void prefetch(`/parts/${category}/`).catch(() => undefined).then(() => setTimeout(next, 30));
+    void prefetch(`/parts/${category}/`).catch(() => undefined)
+      .then(() => loadCategory(category).catch(() => undefined))
+      .then(() => {
+        drawPictures();
+        setTimeout(next, 30);
+      });
   };
   setTimeout(next, 200);
 }
@@ -101,6 +109,78 @@ function warmCategory(category: Category | null): void {
     scene?.warm(items.filter((item): item is Exclude<CatalogItem, CasePart> => item.category !== 'case'));
     refresh();
   }).catch(() => undefined);
+}
+
+// ---- pictures of parts ---------------------------------------------------------
+
+/** Line drawings of single parts, made in the browser from the same models the build uses. */
+const pictures = new Map<string, string>();
+const figures = new Map<string, string>();
+let drawing = false;
+
+/** The part that stands for a category on the home sheet: what is seated, else its first item. */
+function faceOf(category: Category): CatalogItem | undefined {
+  const slots = store.slots;
+  if (category === 'case') return slots.case;
+  const seated = category === 'storage' ? slots.storage[0] : slots[category];
+  return seated ?? itemsOf(category)?.[0];
+}
+
+/** Shows a drawing in the box that was reserved for it, so nothing around it moves. */
+function fill(box: Element | null, url: string): void {
+  if (!box) return;
+  const shown = box.querySelector('img');
+  if (shown) {
+    if (shown.src !== url) shown.src = url;
+    return;
+  }
+  const image = new Image();
+  image.alt = '';
+  image.draggable = false;
+  image.src = url;
+  box.replaceChildren(image);
+}
+
+/** Puts the pictures already made into the cards on screen, and queues the rest. */
+function drawPictures(): void {
+  const waiting: HTMLElement[] = [];
+  for (const link of panel.querySelectorAll<HTMLElement>('.catlink')) {
+    const face = faceOf(link.dataset.cat as Category);
+    if (!face) continue;
+    link.dataset.id = face.id;
+    const url = pictures.get(face.id);
+    if (url) fill(link.querySelector('.shot'), url);
+    else waiting.push(link);
+  }
+  for (const card of panel.querySelectorAll<HTMLElement>('.card[data-id]')) {
+    const id = card.dataset.id!;
+    if (card.classList.contains('detail')) {
+      const item = peek(id);
+      const url = figures.get(id) ?? (item && scene?.thumbnail(item, 660, 528));
+      if (!url) continue;
+      figures.set(id, url);
+      fill(card.querySelector('.figure'), url);
+      continue;
+    }
+    const url = pictures.get(id);
+    if (url) fill(card.querySelector('.shot'), url);
+    else if (peek(id)) waiting.push(card);
+  }
+  if (drawing || !waiting.length || !scene || scene.look !== 'drawing') return;
+  drawing = true;
+  const next = (): void => {
+    drawing = false;
+    const card = waiting.shift();
+    const item = card && (peek(card.dataset.id!) ?? (card.dataset.id === store.pcCase.id ? store.pcCase : undefined));
+    // Wait for a quiet moment: a picture takes a few milliseconds of the main thread.
+    if (item && scene?.stats.settled) {
+      const url = scene.thumbnail(item, 168, 132);
+      if (url) pictures.set(item.id, url);
+    }
+    drawPictures();
+  };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(next, { timeout: 400 });
+  else setTimeout(next, 40);
 }
 
 // ---- looking things up -------------------------------------------------------
@@ -203,6 +283,7 @@ function refresh(): void {
     link.classList.toggle('in', chosen.length > 0);
   }
   applyFilters();
+  drawPictures();
 
   const total = store.steps.length;
   undo.disabled = store.cursor === 0;
@@ -512,6 +593,12 @@ replay.addEventListener('click', (event) => {
   powerDown();
   scene?.markInput(event.timeStamp);
   scene?.replay();
+});
+lookButton.addEventListener('click', () => {
+  if (!scene) return;
+  scene.setLook(scene.look === 'drawing' ? 'shaded' : 'drawing');
+  lookButton.textContent = scene.look === 'drawing' ? 'Shaded' : 'Drawing';
+  drawPictures();
 });
 window.addEventListener('keydown', (event) => {
   if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;

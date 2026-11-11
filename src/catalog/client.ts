@@ -6,6 +6,7 @@ import type { CatalogItem, Category } from './types.ts';
 
 const loads = new Map<Category, Promise<CatalogItem[]>>();
 const byId = new Map<string, CatalogItem>();
+const lists = new Map<Category, CatalogItem[]>();
 
 export function loadCategory(category: Category): Promise<CatalogItem[]> {
   let load = loads.get(category);
@@ -17,12 +18,18 @@ export function loadCategory(category: Category): Promise<CatalogItem[]> {
       })
       .then((items) => {
         remember(items);
+        lists.set(category, items);
         return items;
       });
     load.catch(() => loads.delete(category));
     loads.set(category, load);
   }
   return load;
+}
+
+/** A category's items, if its data has already arrived. */
+export function itemsOf(category: Category): CatalogItem[] | undefined {
+  return lists.get(category);
 }
 
 /** An item whose data has already arrived, if it has. */
