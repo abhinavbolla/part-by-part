@@ -169,7 +169,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   const boardPart = (): MotherboardPart | undefined =>
     store.steps.find((step): step is MotherboardPart => step.category === 'motherboard');
-  const currentLayout = (): BoardLayout => boardLayout(boardPart()?.formFactor ?? 'ATX');
+  const currentLayout = (): BoardLayout => boardLayout(boardPart() ?? 'ATX');
   const currentBoard = (): BoardModel | undefined => {
     const part = boardPart();
     return part ? (models.get(part.id) as BoardModel | undefined) : undefined;
@@ -178,6 +178,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     socket: (open) => currentBoard()?.socket(open),
     dimm: (open) => currentBoard()?.dimm(open),
     latch: (open) => currentBoard()?.latch(open),
+    m2: (slot, open) => currentBoard()?.m2(slot, open),
   };
   /** Everything in the timeline, including undone steps, so their geometry can be found. */
   const allSlots = (): Slots => slotsFrom(store.pcCase, store.steps, store.mounts);
@@ -213,7 +214,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   }
 
   function build(step: Step): PartModel {
-    const bl = step.category === 'motherboard' ? boardLayout(step.formFactor) : currentLayout();
+    const bl = step.category === 'motherboard' ? boardLayout(step) : currentLayout();
     switch (step.category) {
       case 'motherboard': return buildBoard(step, lay, bl);
       case 'cpu': return buildCpu(step, bl, fixtures);
@@ -224,7 +225,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       case 'ram': return buildRam(step, bl, fixtures);
       case 'storage': {
         const mount = mountOf(step);
-        return mount.kind === 'm2' ? buildM2(step, bl, mount.index) : buildDrive25(step, lay, mount.index);
+        return mount.kind === 'm2' ? buildM2(step, bl, mount.index, fixtures) : buildDrive25(step, lay, mount.index);
       }
       case 'gpu':
         // Which of the case's slot covers this card takes the place of
@@ -909,7 +910,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     model.group.visible = true;
     model.setProgress(1, false);
     model.group.scale.setScalar(1);
+    if (model.portrait) model.group.rotation.set(...model.portrait);
     const url = picture(model.group, w, h, scale);
+    if (model.portrait) model.group.rotation.set(0, 0, 0);
     pose(item.id, was, false, true);
     return url;
   }

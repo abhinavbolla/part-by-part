@@ -18,10 +18,12 @@ import {
   Shape,
   TubeGeometry,
   Vector3,
+  type BufferGeometry,
   type Material,
   type Object3D,
 } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const UNIT_BOX = new BoxGeometry(1, 1, 1);
 const UNIT_CYL = new CylinderGeometry(1, 1, 1, 24);
@@ -258,17 +260,20 @@ export function ring(parent: Object3D, outer: number, inner: number, depth: numb
 }
 
 /**
- * Many copies of one box in a single draw: fins, slats, the slits of a mesh
+ * Many copies of one shape in a single draw: fins, slats, the slits of a mesh
  * panel. `place` positions and sizes copy i through the dummy it is given.
+ * The shape is a unit box unless a token, a rod (radius 1, one long, along y)
+ * or a geometry of its own is named.
  */
 export function copies(
   parent: Object3D,
   count: number,
   material: Material,
   place: (dummy: Node3D, i: number) => void,
-  shape: 'box' | 'hex' | 'tri' = 'box',
+  shape: 'box' | 'hex' | 'tri' | 'rod' | BufferGeometry = 'box',
 ): InstancedMesh {
-  const mesh = new InstancedMesh(shape === 'hex' ? UNIT_HEX : shape === 'tri' ? UNIT_TRI : UNIT_BOX, material, Math.max(1, count));
+  const geometry = shape === 'hex' ? UNIT_HEX : shape === 'tri' ? UNIT_TRI : shape === 'rod' ? UNIT_CYL_LOW : shape === 'box' ? UNIT_BOX : shape;
+  const mesh = new InstancedMesh(geometry, material, Math.max(1, count));
   mesh.count = count;
   const dummy = new Node3D();
   for (let i = 0; i < count; i++) {
@@ -305,6 +310,18 @@ function blade(): ExtrudeGeometry {
   return bladeGeometry;
 }
 
+const wheels = new Map<number, BufferGeometry>();
+
+/** All the blades of a fan as one shape, one unit in radius, so a rotor is a single draw however many it has. */
+function wheel(blades: number): BufferGeometry {
+  let geometry = wheels.get(blades);
+  if (!geometry) {
+    geometry = mergeGeometries(Array.from({ length: blades }, (_, i) => blade().clone().rotateZ((i / blades) * Math.PI * 2)));
+    wheels.set(blades, geometry);
+  }
+  return geometry;
+}
+
 export interface Fan {
   group: Group;
   rotor: Group;
@@ -313,9 +330,17 @@ export interface Fan {
 /**
  * An axial fan lying in the x-y plane, blowing along z: a frame with a round
  * opening and four mounting holes, struts behind, and a hub with swept blades.
- * `round` gives the frame a circular outline, as some 140 mm fans have.
+ * `round` gives the frame a circular outline, as some 140 mm fans have. `tips`
+ * joins the blade tips with a ring, or with arcs that link them two by two.
  */
-export function fan(parent: Object3D, size: number, thickness: number, blades = 7, round = false): Fan {
+export function fan(
+  parent: Object3D,
+  size: number,
+  thickness: number,
+  blades = 7,
+  round = false,
+  tips: 'full' | 'pairs' | 'none' = 'none',
+): Fan {
   const group = new Group();
   const opening = circle(0.47, 36).reverse() as [number, number][];
   const outlineShape = round ? circle(0.52, 40) : chamfered(1, 1, 0.07);
@@ -342,11 +367,20 @@ export function fan(parent: Object3D, size: number, thickness: number, blades = 
   const radius = size * 0.455;
   cyl(rotor, radius * 0.32, thickness * 0.6, M.fanFrame, 'z');
   cyl(rotor, radius * 0.2, 0.6, M.labelDim, 'z', 0, 0, thickness * 0.3 + 0.2);
-  for (let i = 0; i < blades; i++) {
-    const mesh = new Mesh(blade(), M.fanBlade);
-    mesh.scale.setScalar(radius);
-    mesh.rotation.z = (i / blades) * Math.PI * 2;
-    rotor.add(mesh);
+  const vanes = new Mesh(wheel(blades), M.fanBlade);
+  vanes.scale.setScalar(radius);
+  rotor.add(vanes);
+  if (tips === 'full') {
+    ring(rotor, radius * 0.985, radius * 0.94, Math.max(1.2, thickness * 0.3), M.fanBlade, 0, 0, -thickness * 0.15);
+  } else if (tips === 'pairs') {
+    // A short bar across the tips of every second pair of neighbours
+    const step = (Math.PI * 2) / blades;
+    for (let i = 0; i + 1 < blades; i += 2) {
+      const angle = (i + 0.5) * step + (32 * Math.PI) / 180;
+      const bar = box(rotor, radius * 0.045, 2 * radius * 0.96 * Math.sin(step / 2) * 1.5, Math.max(1.2, thickness * 0.3), M.fanBlade,
+        Math.cos(angle) * radius * 0.95, Math.sin(angle) * radius * 0.95, 0);
+      bar.rotation.z = angle;
+    }
   }
   group.add(rotor);
   parent.add(group);
@@ -381,12 +415,13 @@ export function tube(
   points: [number, number, number][],
   radius: number,
   material: Material,
+  lines = false,
+  segments = Math.max(14, points.length * 9),
 ): Mesh {
   const curve = new CatmullRomCurve3(points.map(([x, y, z]) => new Vector3(x, y, z)), false, 'centripetal');
-  const segments = Math.max(14, points.length * 9);
   const mesh = new Mesh(new TubeGeometry(curve, segments, radius, RADIAL, false), material);
   mesh.userData.own = true;
-  mesh.userData.noLines = true; // a cable is a dark stroke already
+  mesh.userData.noLines = !lines; // a cable is a dark stroke already; a pipe is drawn like any solid
   mesh.userData.segments = segments;
   parent.add(mesh);
   return mesh;

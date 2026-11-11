@@ -3,11 +3,13 @@
 // origin at the top-rear corner of the PCB's top surface, u along +x,
 // v along -y, z out of the board.
 //
-// Board feature positions are generic arrangements per form factor. The
-// outlines and the 20.32 mm slot pitch follow the standards; the rest is
-// approximate and not taken from any one board's drawing.
+// Each form factor has a usual arrangement of board features. The outlines
+// and the 20.32 mm slot pitch follow the standards; the rest of that
+// arrangement is approximate. A board whose own arrangement the catalog
+// records (`look`) replaces the socket, slots, M.2 sockets, CPU power sockets
+// and coin cell with its own.
 
-import type { CasePart, FormFactor } from '../catalog/types.ts';
+import type { CasePart, FormFactor, MotherboardPart } from '../catalog/types.ts';
 
 export interface Spot {
   u: number;
@@ -23,6 +25,13 @@ export interface Decor extends Spot {
   round?: number;
 }
 
+/** One expansion slot. `len` and `steel` are set when the board's own arrangement is known. */
+export interface SlotRow extends Spot {
+  x16: boolean;
+  len?: number;
+  steel?: boolean;
+}
+
 export interface BoardLayout {
   formFactor: FormFactor;
   w: number;
@@ -31,11 +40,11 @@ export interface BoardLayout {
   socket: Spot & { top: number };
   /** DIMM slot centre lines along u; `pair` are the slots a two-module kit uses. */
   dimm: { u: number[]; v0: number; len: number; height: number; pair: number[] };
-  /** M.2 connectors in fill order; the drive runs toward +u from each. */
-  m2: Spot[];
+  /** M.2 connectors in fill order. The drive runs toward +u from each unless `dir` is -1; `rise` lifts a socket that sits on something. */
+  m2: (Spot & { dir?: 1 | -1; rise?: number })[];
   m2z: number;
   /** Expansion slot rows; the graphics card uses the first. */
-  pcie: { u: number; len: number; height: number; rows: (Spot & { x16: boolean })[] };
+  pcie: { u: number; len: number; height: number; rows: SlotRow[] };
   holes: Spot[];
   /** Power and header positions, for cables. */
   atx24: Spot & { across: boolean };
@@ -147,10 +156,49 @@ const ITX: BoardLayout = {
   battery: { u: 140, v: 158 },
 };
 
-export function boardLayout(formFactor: FormFactor): BoardLayout {
-  if (formFactor === 'Mini-ITX') return ITX;
-  if (formFactor === 'mATX') return MATX;
-  return ATX;
+const SLOT_LENGTH = { x16: 89, x4: 39, x1: 25 };
+const known = new Map<string, BoardLayout>();
+
+/**
+ * Where things are on a board. A form factor gives the generic arrangement; a
+ * board whose own arrangement is recorded gets its slots and M.2 sockets where
+ * they really are.
+ */
+export function boardLayout(board: MotherboardPart | FormFactor): BoardLayout {
+  const formFactor = typeof board === 'string' ? board : board.formFactor;
+  const base = formFactor === 'Mini-ITX' ? ITX : formFactor === 'mATX' ? MATX : ATX;
+  if (typeof board === 'string' || !board.look) return base;
+  let layout = known.get(board.id);
+  if (!layout) {
+    const first = base.pcie.rows[0];
+    const look = board.look;
+    // The usual fan header sits where these boards have a heatsink; it goes above the memory instead
+    const taken = look.eps.some(([u]) => Math.abs(u - 196) < 22);
+    layout = {
+      ...base,
+      socket: { ...base.socket, u: look.socket[0], v: look.socket[1] },
+      eps: look.eps.map(([u, v]) => ({ u, v })),
+      fanHeader: formFactor === 'Mini-ITX' ? base.fanHeader : { u: taken ? 232 : 196, v: 8 },
+      sata: { u: base.sata.u, v: look.sataAt ?? base.sata.v },
+      battery: look.battery ? { u: look.battery[0], v: look.battery[1] } : base.battery,
+      m2: look.m2.length ? look.m2.map(([u, v, dir, rise]) => ({ u, v, dir, rise })) : base.m2,
+      pcie: {
+        ...base.pcie,
+        rows: [
+          { ...first, steel: true },
+          ...board.look.slots.map((slot) => ({
+            u: first.u,
+            v: first.v + slot.row * SLOT_PITCH,
+            x16: slot.size === 'x16',
+            len: SLOT_LENGTH[slot.size],
+            steel: slot.steel,
+          })),
+        ],
+      },
+    };
+    known.set(board.id, layout);
+  }
+  return layout;
 }
 
 /** Standoff positions a case offers: the ATX pattern plus the extra microATX row. */
