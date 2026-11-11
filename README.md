@@ -41,8 +41,16 @@ come together.
   drawing, made in the browser from the same model.
 - **Parts drawn from what they are:** processor lids differ by socket, coolers
   show their heat pipes and covers, memory shows its heat-spreader outline,
-  graphics cards their fins, backplate and bracket, and each case its own
-  front, top, ports and feet.
+  graphics cards their fins, backplate and bracket.
+- **Cases modelled on the real ones:** each of the four has its own front
+  (wooden slats in a frame, a stood-off panel of triangular holes, round
+  perforation, fine mesh with the fans showing through), its own roof, port
+  row, feet, shroud and closed sections, taken from its maker's photos.
+- **The back of the machine:** drag to turn the case all the way round. The
+  rear panel has its real openings; the board's port block shows every port in
+  the columns that board has them; a graphics card takes out the slot covers
+  it replaces and shows its own display outputs; the power supply shows its
+  inlet, switch and grille.
 - **Your build is kept** in the browser and comes back after a reload.
 - **Power on** once it is complete and wired: fans spin, lights come on.
 
@@ -65,9 +73,10 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
 ## How it is built
 
 - **No model files.** Every part is generated in code from its catalog
-  dimensions and a few recorded features (`src/scene/models`). Parts are the
-  right size and carry their real structure; they carry no logos and are not
-  exact replicas of any product.
+  dimensions and features recorded from its maker's photos
+  (`src/scene/models`). Parts are the right size and carry their real
+  structure, openings and connectors; they carry no logos or brand artwork,
+  and stop short of circuit-level detail.
 - **One number per step.** Seating a part or plugging a cable is a progress
   value from 0 to 1 and every pose is a pure function of it
   (`src/scene/anim.ts`). Undo, replay and scrubbing are the same mechanism.
@@ -122,6 +131,12 @@ shaded (CPU and GPU together, at 2880 x 1800, timed by forcing the GPU to
 finish). The script reports when the display is capped by power saving, since
 no page can be shown to be smoother than the browser's own frame interval.
 
+The table predates the modelled cases and rear panel. That change was timed
+back to back with the version before it, on the same machine while it was busy
+with other work: a line-drawing frame cost 8.1 ms after and 8.8 ms before, a
+shaded frame 9.6 ms after and 8.8 ms before, and the first load grew to
+149 KB. The whole table has not been re-run on a quiet machine since.
+
 The throttled column slows the CPU and network only; the GPU is still this
 machine's. Nothing has been measured on a phone or a low-end laptop, and only
 Chrome has been run.
@@ -130,9 +145,12 @@ Chrome has been run.
 
 Specs in `src/catalog/data` were entered by hand from each manufacturer's own
 product page on 11 November 2026, and every part records the page it came from.
-Cases, coolers and memory also carry a `look` entry, read from the same pages'
-text and photos: what the front panel is, how many heat pipes, the shape of a
-heat spreader's top. It is used only to draw them.
+Cases, coolers, memory and power supplies also carry a `look` entry, read from
+the same pages' text and photos: what the front panel is and how it is
+perforated, how many heat pipes, the shape of a heat spreader's top. Boards
+record their rear ports column by column and graphics cards their display
+outputs. These are used only to draw the parts. Two power supplies have
+three-armed exhaust cut-outs that are drawn as triangles.
 Where a maker does not print a value it is marked in the data file: for example
 AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model

@@ -47,8 +47,9 @@ export interface BoardLayout {
   battery: Spot;
 }
 
-const SLOT_PITCH = 20.32;
-const GPU_ROW = 187;
+export const SLOT_PITCH = 20.32;
+/** Where the first full-length slot of an ATX board sits: the case's second opening. */
+export const GPU_ROW = 187;
 
 const ATX: BoardLayout = {
   formFactor: 'ATX',
@@ -131,7 +132,7 @@ const ITX: BoardLayout = {
     u: 28,
     len: 89,
     height: 11,
-    rows: [{ u: 28, v: GPU_ROW - SLOT_PITCH - 4, x16: true }],
+    rows: [{ u: 28, v: GPU_ROW - SLOT_PITCH, x16: true }],
   },
   holes: [{ u: 16, v: 10 }, { u: 140, v: 10 }, { u: 16, v: 165 }, { u: 140, v: 165 }],
   atx24: { u: 112, v: 6, across: true },

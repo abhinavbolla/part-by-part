@@ -42,11 +42,30 @@ export interface CasePart extends Base {
     front: 'slats' | 'mesh' | 'solid' | 'glass';
     /** Vertical bars across the front, when it is slatted. */
     slats: number;
+    /** The shape of the holes in its perforated panels. */
+    holes: 'slits' | 'triangles' | 'rounds' | 'fine';
+    /** How far back the closed front section runs along the sides, panel included. */
+    frontDepth: number;
+    /** The gap behind a front panel that stands off the body, or 0. */
+    frontGap: number;
     top: 'mesh' | 'solid' | 'slots';
-    frontIo: 'top-front' | 'top-side' | 'front';
+    /** Length of the solid strip at the front of the roof. */
+    topSolidFront: number;
+    /** Where the button and ports sit on the roof: across the front (centred, or starting at the window side) or along the far edge. */
+    ioAt: 'centre' | 'near' | 'far';
     ports: { usbA: number; usbC: number; audio: number };
-    feet: 'bars' | 'pads';
+    reset: boolean;
+    powerRound: boolean;
+    feet: 'bars' | 'pads' | 'rounds' | 'wedges';
     shroud: 'full' | 'vented' | 'none';
+    rearFan: number;
+    rearGrille: 'hex' | 'slots';
+    /** The rear panel is perforated beside the slots and fan. */
+    rearVented: boolean;
+    /** A cover bar down the tray, right of the board, that cables run behind. */
+    cableBar: boolean;
+    /** A pull tab at the back of the roof. */
+    pullTab: boolean;
   };
 }
 
@@ -69,7 +88,15 @@ export interface MotherboardPart extends Base {
   /** 8-pin CPU power sockets on the board. */
   epsConnectors: number;
   fanHeaders: number;
+  /**
+   * The ports on the back, column by column from the board's top edge down.
+   * Within a column the port farthest from the board comes first.
+   */
+  rearIo?: RearPort[][];
 }
+
+export type RearPort =
+  | 'usbA' | 'usbC' | 'hdmi' | 'dp' | 'lan' | 'audio' | 'optical' | 'antenna' | 'button' | 'ps2' | 'vent';
 
 export interface CpuPart extends Base {
   category: 'cpu';
@@ -151,6 +178,8 @@ export interface GpuPart extends Base {
   connectors: { pcie8: number; hpwr16: number };
   recommendedPsu: number;
   fans: number;
+  /** Display outputs on the bracket. */
+  outputs?: { dp: number; hdmi: number };
 }
 
 export interface PsuPart extends Base {
@@ -160,6 +189,8 @@ export interface PsuPart extends Base {
   length: number;
   modular: 'full' | 'semi' | 'none';
   connectors: { atx24: number; eps8: number; pcie8: number; hpwr16: number; sata: number };
+  /** The mains switch and exhaust pattern on the face at the back of the case, and the fan's size. */
+  look?: { switch: boolean; grille: 'hex' | 'tri' | 'slots' | 'none'; fan: number };
 }
 
 /** Things bought from the catalog and seated in the case. */

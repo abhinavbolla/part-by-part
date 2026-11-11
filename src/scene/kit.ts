@@ -26,6 +26,9 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 const UNIT_BOX = new BoxGeometry(1, 1, 1);
 const UNIT_CYL = new CylinderGeometry(1, 1, 1, 24);
 const UNIT_CYL_LOW = new CylinderGeometry(1, 1, 1, 10);
+// Flat tokens one unit across, their axis along y: the holes of a perforated panel.
+const UNIT_HEX = new CylinderGeometry(0.5, 0.5, 1, 6);
+const UNIT_TRI = new CylinderGeometry(0.58, 0.58, 1, 3);
 const rounded = new Map<string, RoundedBoxGeometry>();
 const accentColor = new Color(0xff5a1f);
 
@@ -258,8 +261,15 @@ export function ring(parent: Object3D, outer: number, inner: number, depth: numb
  * Many copies of one box in a single draw: fins, slats, the slits of a mesh
  * panel. `place` positions and sizes copy i through the dummy it is given.
  */
-export function copies(parent: Object3D, count: number, material: Material, place: (dummy: Node3D, i: number) => void): InstancedMesh {
-  const mesh = new InstancedMesh(UNIT_BOX, material, count);
+export function copies(
+  parent: Object3D,
+  count: number,
+  material: Material,
+  place: (dummy: Node3D, i: number) => void,
+  shape: 'box' | 'hex' | 'tri' = 'box',
+): InstancedMesh {
+  const mesh = new InstancedMesh(shape === 'hex' ? UNIT_HEX : shape === 'tri' ? UNIT_TRI : UNIT_BOX, material, Math.max(1, count));
+  mesh.count = count;
   const dummy = new Node3D();
   for (let i = 0; i < count; i++) {
     dummy.position.set(0, 0, 0);
