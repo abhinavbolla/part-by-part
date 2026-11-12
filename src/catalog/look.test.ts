@@ -82,7 +82,12 @@ test('every cooler with recorded details can be drawn', () => {
       const look = cooler.look;
       assert.ok(look.pipes >= 1 && look.pipes <= 10, `${cooler.id}: pipes`);
       assert.equal(look.stack.length, cooler.towers, `${cooler.id}: one depth per tower`);
-      const depth = look.stack.reduce((sum, stack) => sum + stack, 0) + (cooler.towers === 2 ? 30 : 0) + 25 * Math.min(1, cooler.fans);
+      // One tower: the stack and every fan. Two: both stacks, the 30 mm gap the
+      // middle fan hangs in, and the front fan when there is one.
+      const fanDeep = (i: number): number => look.fanDepths?.[i] ?? 25;
+      const depth = look.stack.reduce((sum, stack) => sum + stack, 0) + (cooler.towers === 2
+        ? 30 + (cooler.fans > 1 ? fanDeep(0) : 0)
+        : Array.from({ length: cooler.fans }, (_, i) => fanDeep(i)).reduce((sum, deep) => sum + deep, 0));
       assert.ok(Math.abs(depth - cooler.depth) <= 6, `${cooler.id}: stacks and fans add up to its depth (${depth} against ${cooler.depth})`);
       assert.ok(look.cutaway[0] >= 0 && look.cutaway[0] < cooler.height / 2 && look.cutaway[1] < Math.min(...look.stack), `${cooler.id}: cutaway`);
       if (look.top === 'hood') assert.equal(cooler.towers, 2, `${cooler.id}: a hood spans two towers`);

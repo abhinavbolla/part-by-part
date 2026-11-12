@@ -170,8 +170,11 @@ export function boardLayout(board: MotherboardPart | FormFactor): BoardLayout {
   if (typeof board === 'string' || !board.look) return base;
   let layout = known.get(board.id);
   if (!layout) {
-    const first = base.pcie.rows[0];
     const look = board.look;
+    // Most boards carry the graphics slot in the second slot position; some small ones in the first
+    const first = look.firstSlot === 1 && formFactor !== 'Mini-ITX'
+      ? { ...base.pcie.rows[0], v: GPU_ROW - SLOT_PITCH }
+      : base.pcie.rows[0];
     // The usual fan header sits where these boards have a heatsink; it goes above the memory instead
     const taken = look.eps.some(([u]) => Math.abs(u - 196) < 22);
     layout = {

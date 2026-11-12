@@ -99,6 +99,8 @@ export interface MotherboardPart extends Base {
    * the board, then down it. Used only to draw it.
    */
   look?: {
+    /** Set to 1 on a board whose first full-length slot is in the top slot position, not the second. */
+    firstSlot?: 1;
     /** The middle of the CPU socket. */
     socket: [number, number];
     /** The CPU power sockets along the top edge, an 8-pin first. */
@@ -185,6 +187,10 @@ export interface AirCoolerPart extends CoolerBase {
     cutaway: [number, number];
     /** How far the towers sit off the base's middle, toward the top edge of the board. */
     offset?: number;
+    /** How far the towers sit back from the base's middle along the airflow, toward the rear of the case. */
+    back?: number;
+    /** Each fan's thickness in airflow order, when they are not all 25 mm. */
+    fanDepths?: number[];
     fanFrame: 'square' | 'round';
     /** Each fan's size and blade count in airflow order, when they are not all alike. */
     fanSizes?: number[];
