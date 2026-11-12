@@ -30,6 +30,7 @@ const chip = el('chip');
 const notice = el('notice');
 const hud = el('hud');
 const lookButton = el<HTMLButtonElement>('look');
+const backButton = el<HTMLButtonElement>('back');
 const tabs = el('tabs');
 const tally = el('tally');
 const sheet = el<HTMLButtonElement>('sheet');
@@ -128,6 +129,7 @@ const sceneReady = import('./scene/scene.ts').then((module) => {
     drawPictures();
   });
   lookButton.textContent = scene.look === 'drawing' ? 'Shaded' : 'Drawing';
+  scene.setBackListener((open) => backButton.setAttribute('aria-pressed', String(open)));
   scene.warm(store.steps);
   warmCategory(categoryOf(location.pathname));
   return scene;
@@ -695,6 +697,7 @@ replay.addEventListener('click', (event) => {
   scene?.markInput(event.timeStamp);
   scene?.replay();
 });
+backButton.addEventListener('click', () => scene?.setBack(!scene.back));
 lookButton.addEventListener('click', () => {
   if (!scene) return;
   scene.setLook(scene.look === 'drawing' ? 'shaded' : 'drawing');

@@ -325,20 +325,38 @@ export function buildAirCooler(part: AirCoolerPart, bl: BoardLayout): PartModel 
   };
 }
 
-/** Where the radiator sits, and the corner its hoses leave from. */
-function radiatorPlace(part: LiquidCoolerPart, lay: CaseLayout, mount: 'top' | 'front') {
+/**
+ * Where the radiator sits. Its fans are packed edge to edge in the middle of
+ * it, which leaves a tank clear at each end; the hoses leave from the fan-side
+ * face of one tank (`ports`), heading along `out`, so they never cross a fan.
+ */
+export function radiatorPlace(part: LiquidCoolerPart, lay: CaseLayout, mount: 'top' | 'front') {
   const { length, width, thickness } = part.radiator;
   const zc = lay.W / 2 - PANEL - 2 - width / 2;
+  const row = (i: number): number => (i - (part.fans - 1) / 2) * part.fanSize;
+  // The bare tank at each end, and how far in from the end the fittings sit: its middle
+  const tank = (length - part.fans * part.fanSize) / 2;
+  const hoseR = (part.look?.hose ?? 11) / 2;
+  let inset = Math.max(8, tank / 2);
   if (mount === 'top') {
-    const x = Math.min(lay.frontInner - 10 - length / 2, lay.rearInner + 12 + length / 2 + 40);
+    // Back from the front fans far enough for the hoses to come down in front of it,
+    // unless the case is too short for that: then it stops against the rear wall,
+    // and the fittings move in as far as the tank lets them
+    const x = Math.max(
+      lay.rearInner + length / 2,
+      Math.min(lay.frontInner - 32 - length / 2, lay.rearInner + 52 + length / 2),
+    );
+    const room = lay.frontInner - lay.frontFans - (x + length / 2);
+    inset = Math.max(inset, Math.min(tank - hoseR, hoseR + 0.5 - room));
     const y = lay.H - PANEL - thickness / 2;
     return {
       centre: [x, y, zc] as [number, number, number],
       size: [length, thickness, width] as [number, number, number],
       along: 'x' as const,
-      fanCentre: (i: number): [number, number, number] =>
-        [x - length / 2 + (length * (i + 0.5)) / part.fans, y - thickness / 2 - 12.5, zc],
-      port: [x - length / 2 + 14, y - thickness / 2 - 4, zc] as [number, number, number],
+      fanCentre: (i: number): [number, number, number] => [x + row(i), y - thickness / 2 - 12.5, zc],
+      // Under the tank at the front end
+      ports: [-12, 12].map((dz): [number, number, number] => [x + length / 2 - inset, y - thickness / 2, zc + dz]),
+      out: [0, -1, 0] as [number, number, number],
     };
   }
   const x = lay.frontInner - 27 - thickness / 2;
@@ -348,9 +366,10 @@ function radiatorPlace(part: LiquidCoolerPart, lay: CaseLayout, mount: 'top' | '
     centre: [x, y, zc] as [number, number, number],
     size: [thickness, length, width] as [number, number, number],
     along: 'y' as const,
-    fanCentre: (i: number): [number, number, number] =>
-      [x - thickness / 2 - 12.5, top - (length * (i + 0.5)) / part.fans, zc],
-    port: [x - thickness / 2 - 4, top - 16, zc] as [number, number, number],
+    fanCentre: (i: number): [number, number, number] => [x - thickness / 2 - 12.5, y - row(i), zc],
+    // On the tank at the top, facing into the case
+    ports: [-12, 12].map((dz): [number, number, number] => [x - thickness / 2, top - inset, zc + dz]),
+    out: [-1, 0, 0] as [number, number, number],
   };
 }
 
@@ -366,6 +385,56 @@ function roundedRect(w: number, h: number, r: number): [number, number][] {
   return points;
 }
 
+const PLAIN_PUMP = { block: 'round' as const, blockSize: 68, cap: 'disc' as const, hose: 11, blades: 7 };
+
+/** Where the hoses leave the pump block: how far out from its centre, and how high up its side. */
+function pumpFittings(part: LiquidCoolerPart): { reach: number; rise: number } {
+  const look = part.look ?? PLAIN_PUMP;
+  return { reach: look.blockSize / 2 + (look.cap === 'vanes' ? 9 : 0), rise: Math.max(12, part.height * 0.27) };
+}
+
+/**
+ * The centre line of each of the two hoses, block to radiator. Each leaves its
+ * elbow straight out from the board, far enough to pass over the memory, then
+ * sweeps round to come squarely into its collar from below the fans (or from
+ * behind them, on a front radiator).
+ */
+export function hosePaths(
+  part: LiquidCoolerPart,
+  lay: CaseLayout,
+  bl: BoardLayout,
+  mount: 'top' | 'front',
+): [number, number, number][][] {
+  const { reach, rise } = pumpFittings(part);
+  const place = radiatorPlace(part, lay, mount);
+  const cpuTop = [lay.board.x + bl.socket.u, lay.board.y - bl.socket.v, lay.board.z + bl.socket.top + CPU_HEIGHT];
+  return [-12, 12].map((side, i) => {
+    const start: [number, number, number] = [cpuTop[0] + reach + 9, cpuTop[1] + side, cpuTop[2] + rise + 10];
+    const end = place.ports[i];
+    const back = (mm: number): [number, number, number] =>
+      [end[0] + place.out[0] * mm, end[1] + place.out[1] * mm, end[2] + place.out[2] * mm];
+    // The last bend is aimed from a little to the pump's side of the collar, so
+    // the hose straightens into it without swinging out past it
+    const lead = back(70);
+    const toward = start.map((value, axis) => value - lead[axis]);
+    const along = toward.reduce((sum, value, axis) => sum + value * place.out[axis], 0);
+    const across = toward.map((value, axis) => value - along * place.out[axis]);
+    const far = Math.hypot(...across) || 1;
+    across.forEach((value, axis) => { lead[axis] += (value / far) * 5; });
+    const out = Math.max(start[2] + 40, lay.board.z + 78);
+    return [
+      start,
+      [start[0] + 2, start[1], start[2] + 22],
+      [start[0] + 26, start[1] + (lead[1] - start[1]) * 0.12, out],
+      [start[0] + (lead[0] - start[0]) * 0.55, start[1] + (lead[1] - start[1]) * 0.5, Math.max(out, lead[2]) + 12],
+      lead,
+      back(46),
+      back(26),
+      back(6),
+    ];
+  });
+}
+
 export function buildLiquidCooler(
   part: LiquidCoolerPart,
   lay: CaseLayout,
@@ -373,7 +442,7 @@ export function buildLiquidCooler(
   mount: 'top' | 'front',
 ): PartModel {
   const group = new Group();
-  const look = part.look ?? { block: 'round' as const, blockSize: 68, cap: 'disc' as const, hose: 11, blades: 7 };
+  const look = part.look ?? PLAIN_PUMP;
   const size = look.blockSize;
   const cpuTop: [number, number, number] = [
     lay.board.x + bl.socket.u,
@@ -418,12 +487,12 @@ export function buildLiquidCooler(
   }
   // Hoses leave low on the side that faces the front of the case, through right-angle fittings
   const hoseR = look.hose / 2;
-  const hoseZ = Math.max(12, part.height * 0.27);
-  const reach = size / 2 + (vaned ? 9 : 0);
+  const { reach, rise: hoseZ } = pumpFittings(part);
   if (vaned) box(block, reach - waist + 4, 34, 16, M.gpuShroud, (waist + reach) / 2, 0, hoseZ);
   for (const side of [-12, 12]) {
     cyl(block, hoseR + 2.5, 8, M.steel, 'x', reach + 3, side, hoseZ, true);
-    cyl(block, hoseR + 1, 8, M.steel, 'x', reach + 9, side, hoseZ, true);
+    // The elbow: it turns the hose to leave away from the board
+    cyl(block, hoseR + 1.6, 10 + hoseR, M.steel, 'z', reach + 9, side, hoseZ + 5 - hoseR / 2, true);
   }
   const hold = look.block === 'round' ? size * 0.27 : size / 2 - 7;
   const screws = [[hold, hold], [hold, -hold], [-hold, hold], [-hold, -hold]].map(([x, y]) => screw(block, x, y, 7, 2.4));
@@ -467,19 +536,13 @@ export function buildLiquidCooler(
   }
   group.add(rad);
 
-  // Two hoses from the block to the radiator
-  const hoses: Mesh[] = [-12, 12].map((dz) => {
-    const start: [number, number, number] = [cpuTop[0] + reach + 12, cpuTop[1] + dz, cpuTop[2] + hoseZ];
-    const end: [number, number, number] = [place.port[0], place.port[1], place.port[2] + dz];
-    const lift = Math.max(start[2], end[2]) + 26;
-    return tube(group, [
-      start,
-      [start[0] + 22, start[1], start[2] + 10],
-      [(start[0] + end[0]) / 2 + 20, (start[1] + end[1]) / 2, lift],
-      [end[0], end[1] - 14, end[2] + 6],
-      end,
-    ], hoseR, M.hose);
-  });
+  // A collar where each hose meets the tank
+  for (const port of place.ports) {
+    cyl(rad, hoseR + 1.6, 7, M.steel, place.along === 'x' ? 'y' : 'x',
+      port[0] + place.out[0] * 3.5, port[1] + place.out[1] * 3.5, port[2], true);
+  }
+
+  const hoses: Mesh[] = hosePaths(part, lay, bl, mount).map((points) => tube(group, points, hoseR, M.hose, false, 72));
 
   return {
     group,

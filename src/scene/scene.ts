@@ -152,7 +152,11 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     boardFrame = new Group();
     boardFrame.position.set(lay.board.x, lay.board.y, lay.board.z);
     caseModel.group.add(boardFrame);
+    caseModel.backPanel(backT);
   }
+  /** Whether the far panel is off, and how far off it is right now (0..1). */
+  let back = false;
+  let backT = 0;
   mountCase();
 
   // ---- step models ---------------------------------------------------------
@@ -450,8 +454,26 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     renderer.render(scene, camera);
   }
 
+  /** How quickly the view closes on where it is headed: quick under the hand, slower for a turn of its own. */
+  let pace = 14;
+  const REST = { az: 0.62, el: 0.4 };
+
+  /** Takes the far panel off and turns the machine to show the cables behind the tray, or puts it back. */
+  let onBack: ((open: boolean) => void) | null = null;
+  function setBack(open: boolean): void {
+    if (back === open) return;
+    back = open;
+    onBack?.(open);
+    const az = open ? Math.PI - REST.az : REST.az;
+    viewTarget.az = az + Math.round((viewTarget.az - az) / (Math.PI * 2)) * Math.PI * 2;
+    viewTarget.el = open ? 0.3 : REST.el;
+    pace = 4.5;
+    invalidate();
+  }
+
   function orbit(dx: number, dy: number): void {
     // All the way round: the back of the machine is part of the drawing.
+    pace = 14;
     viewTarget.az -= dx * 0.006;
     viewTarget.el = Math.max(0.05, Math.min(1.2, viewTarget.el + dy * 0.005));
     invalidate();
@@ -501,6 +523,9 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       return;
     }
     if (change.kind === 'install' && change.step && change.index !== undefined) {
+      // A part goes in from the open side, so the machine turns back to show it.
+      // A cable can be watched from either side.
+      if (change.step.category !== 'cable') setBack(false);
       ensure(change.step);
       const start = loose.get(change.step.id)?.p ?? 0;
       loose.delete(change.step.id);
@@ -801,7 +826,14 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     if (applyPower(dt)) active = true;
     if (stepEmphasis(dt)) active = true;
 
-    const ease = 1 - Math.exp(-dt * 14);
+    const backGoal = back ? 1 : 0;
+    if (backT !== backGoal) {
+      backT = backGoal > backT ? Math.min(1, backT + dt / 0.9) : Math.max(0, backT - dt / 0.7);
+      caseModel.backPanel(backT);
+      active = true;
+    }
+
+    const ease = 1 - Math.exp(-dt * pace);
     for (const key of ['az', 'el', 'zoom'] as const) {
       const delta = viewTarget[key] - view[key];
       if (Math.abs(delta) > 0.0004) {
@@ -839,7 +871,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   // ---- pictures of single parts ---------------------------------------------
 
   let studio: { out: WebGLRenderTarget; camera: OrthographicCamera; canvas: HTMLCanvasElement } | null = null;
-  const REST = new Vector3(Math.sin(0.62) * Math.cos(0.4), Math.sin(0.4), Math.cos(0.62) * Math.cos(0.4));
+  const RESTING = new Vector3(Math.sin(REST.az) * Math.cos(REST.el), Math.sin(REST.el), Math.cos(REST.az) * Math.cos(REST.el));
 
   /**
    * Draws `target` alone, from the resting angle, and returns it as an image
@@ -862,7 +894,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     target.updateWorldMatrix(true, true);
     const bounds = new Box3().setFromObject(target);
     const middle = bounds.getCenter(new Vector3());
-    eye.position.copy(middle).addScaledVector(REST, 3000);
+    eye.position.copy(middle).addScaledVector(RESTING, 3000);
     eye.lookAt(middle);
     eye.updateMatrixWorld();
     const right = new Vector3().setFromMatrixColumn(eye.matrixWorld, 0);
@@ -1020,6 +1052,10 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     setProgressListener(listener: (value: number) => void): void { onProgress = listener; },
     orbit,
     zoomBy,
+    setBack,
+    get back(): boolean { return back; },
+    /** Called when the far panel comes off or goes back on. */
+    setBackListener(listener: (open: boolean) => void): void { onBack = listener; },
     resize,
     setPower,
     get powered(): boolean { return powered; },
