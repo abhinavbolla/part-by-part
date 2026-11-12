@@ -1,0 +1,34 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Choose the North case
+        2. Add the MAG B650 Tomahawk WiFi
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Browser and device
+      description: Browser and version, the device or window size, mouse or touch, and the commit if you know it.
+      placeholder: Safari 26 on an iPhone 16, portrait, touch
+    validations:
+      required: true
+  - type: textarea
+    id: shot
+    attributes:
+      label: Screenshot
+      description: A screenshot helps most with anything about how a part or the page looks.
