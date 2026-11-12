@@ -56,11 +56,12 @@ const sfx = get('corsair-sf750-2024');
 const codes = (installed: Step[], step: Step, pcCase: CasePart = north): string[] =>
   checkAdd(slotsFrom(pcCase, installed), step).map((issue) => issue.code);
 
-test('catalog: ids are unique, every item has a source, and there are about sixty', () => {
+test('catalog: ids and part numbers are unique, every item has a source, and there are over a hundred', () => {
   assert.equal(new Set(CATALOG.map((item) => item.id)).size, CATALOG.length);
+  assert.equal(new Set(CATALOG.map((item) => `${item.category} ${item.sku}`)).size, CATALOG.length);
   for (const item of CATALOG) assert.match(item.source, /^https:\/\//, item.id);
-  assert.ok(CATALOG.length >= 55, `only ${CATALOG.length} items`);
-  assert.equal(CASES.length, 4);
+  assert.ok(CATALOG.length >= 110, `only ${CATALOG.length} items`);
+  assert.equal(CASES.length, 10);
 });
 
 test('every board fits at least one case, and every ATX board fits every case', () => {

@@ -259,7 +259,8 @@ export function caseLayout(pcCase: CasePart): CaseLayout {
   // Feet, shroud, board, then whatever is left above the board.
   let floorY = 22;
   const boardH = ATX.h;
-  const shroudH = Math.max(90, Math.min(110, H - floorY - PANEL - 6 - boardH - 30));
+  // Never lower than a power supply is tall, with a little air over it
+  const shroudH = Math.max(94, Math.min(110, H - floorY - PANEL - 6 - boardH - 30));
   const spare = H - PANEL - (floorY + shroudH + 6 + boardH);
   if (spare < 12) floorY = Math.max(8, floorY - (12 - spare));
   const shroudTopY = floorY + shroudH;
