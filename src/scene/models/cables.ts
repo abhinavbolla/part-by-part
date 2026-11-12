@@ -1,6 +1,8 @@
-// Cable runs. Only the parts you would see are drawn: a plug at each visible
-// end and the stretch of cable from it to where it ducks behind the tray or
-// under the shroud. A cable is plugged in, then drawn along its route.
+// Cable runs. From the open side you see a plug at each end and the stretch of
+// cable from it to where it ducks behind the tray or under the shroud. Behind
+// the tray, each cable carries on: down a run beside the grommets, held by the
+// straps, to the open end of the power-supply chamber. That part shows when
+// the far panel is off. A cable is plugged in, then drawn along its route.
 
 import { Group, type Mesh } from 'three';
 
@@ -29,6 +31,9 @@ interface Run {
   tube: Mesh;
 }
 
+/** Where each kind of cable runs behind the tray: millimetres from the grommets' centre line. */
+const LANE = { atx24: -3, eps: 10, sata: -14 } as const;
+
 /** PSU front-face socket used by each kind of cable. */
 const PSU_SOCKET = { atx24: 0, eps: 2, gpu: 4, sata: 9 } as const;
 
@@ -53,35 +58,93 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
     runs.push({ plug, home, out, tube: tube(group, points, radius, material) });
   };
 
-  /** The end that plugs into the power supply, if one is fitted. */
-  const psuEnd = (psu: PsuPart | undefined, index: number, radius: number): void => {
-    if (!psu) return;
+  // ---- behind the tray -------------------------------------------------------
+  const backs: Mesh[] = [];
+  const zb = lay.trayZ - 9;
+  const trunkX = lay.grommets[0].x;
+  const { chamber } = lay;
+  const hidden = (points: P3[], radius: number, material = M.cable): void => {
+    backs.push(tube(group, points, radius, material, false, Math.max(24, points.length * 8)));
+  };
+  /** Down the run from a grommet into the chamber, or on to `to` when the cable ends at the power supply. */
+  const fromGrommet = (grommet: { x: number; y: number }, lane: number, radius: number, to: P3 | null, material = M.cable): void => {
+    const x = trunkX + lane;
+    const foot: P3[] = to
+      ? [[x, chamber.y1 - 6, zb], [(x + to[0]) / 2 + 8, to[1] + 16, zb], [to[0] + 4, to[1] + 2, zb + 2], to]
+      : [[x, chamber.y1 + 4, zb], [x, chamber.y1 - 10, zb + 4], [x - 4, chamber.y1 - 18, lay.trayZ + 6]];
+    hidden([
+      [grommet.x, grommet.y, behind], [(grommet.x + x) / 2, grommet.y - 10, zb], [x, grommet.y - 28, zb],
+      ...foot,
+    ], radius, material);
+  };
+  /** From the cut-out above the board: along the top, then down the run to `to`. */
+  const fromTop = (x: number, lane: number, radius: number, to: P3 | null): void => {
+    const lx = trunkX + lane;
+    const y = lay.topCut.y;
+    const foot: P3[] = to
+      ? [[lx, chamber.y1 - 6, zb], [(lx + to[0]) / 2 + 8, to[1] + 16, zb], [to[0] + 4, to[1] + 2, zb + 2], to]
+      : [[lx, chamber.y1 + 4, zb]];
+    hidden([
+      [x, y, behind], [x + 8, y - 10, zb], [x + 34, y - 16, zb],
+      [lx - 30, y - 16, zb], [lx - 6, y - 26, zb], [lx, y - 52, zb],
+      [lx, lay.board.y - 150, zb],
+      ...foot,
+    ], radius);
+  };
+
+  /**
+   * The end that plugs into the power supply, if one is fitted. A cable for
+   * something above the shroud stays in the chamber and comes up at `under`;
+   * the others pass through the tray, and the point where they do is returned.
+   */
+  const psuEnd = (psu: PsuPart | undefined, index: number, radius: number, under?: P3): P3 | null => {
+    if (!psu) return null;
     const [sx, sy, sz] = psuSocket(psu, lay, index);
+    if (under) {
+      const turn = Math.max(under[0], sx + 42);
+      run([10, 12, 15], [sx + 5, sy, sz], [18, 0, 0], [
+        [sx + 10, sy, sz],
+        [sx + 28, sy + 3, sz],
+        [(sx + 28 + turn) / 2 + 6, (sy + under[1]) / 2 - 4, (sz + under[2]) / 2],
+        [turn, under[1] - 24, under[2] + 3],
+        [under[0], under[1] - 6, under[2]],
+        under,
+      ], radius);
+      return null;
+    }
+    // Side by side through the tray, in the order of their sockets
+    const column = Math.floor(index / 2);
+    const through: P3 = [
+      Math.min(chamber.x1 - 10, Math.max(chamber.x0 + 10, sx + 34 + column * 11)),
+      Math.min(chamber.y1 - 12, sy + 8 + column * 12),
+      behind,
+    ];
     run([10, 12, 15], [sx + 5, sy, sz], [18, 0, 0], [
       [sx + 10, sy, sz],
-      [sx + 32, sy + 2, sz - 4],
-      [sx + 46, sy + 6, (sz + lay.trayZ) / 2],
-      [sx + 44, sy + 8, behind],
+      [sx + 30, sy + 2, sz - 4],
+      [through[0] + 2, through[1] - 2, (sz + lay.trayZ) / 2],
+      through,
     ], radius);
+    return through;
   };
 
   switch (cable.kind) {
     case 'atx24': {
       const spot = bl.atx24;
       const [x, y] = [X(spot.u), Y(spot.v)];
+      const board = (points: P3[], size: P3): void => run(size, [x, y, Z(17.5)], [0, 0, 20], points, 5.5);
       if (spot.across) {
-        run([52, 10, 9], [x, y, Z(17.5)], [0, 0, 20], [
-          [x, y, Z(22)], [x, y + 10, Z(30)], [x, lay.topCut.y, Z(14)], [x, lay.topCut.y, behind],
-        ], 5.5);
+        board([[x, y, Z(22)], [x, y + 10, Z(30)], [x, lay.topCut.y, Z(14)], [x, lay.topCut.y, behind]], [52, 10, 9]);
+        fromTop(x, LANE.atx24, 5.5, psuEnd(slots.psu, PSU_SOCKET.atx24, 5.5));
       } else {
         const grommet = grommetNear(y);
-        run([10, 52, 9], [x, y, Z(17.5)], [0, 0, 20], [
+        board([
           [x, y, Z(22)], [x + 10, y, Z(34)],
           [(x + grommet.x) / 2 + 6, (y + grommet.y) / 2, Z(30)],
           [grommet.x, grommet.y, Z(8)], [grommet.x, grommet.y, behind],
-        ], 5.5);
+        ], [10, 52, 9]);
+        fromGrommet(grommet, LANE.atx24, 5.5, psuEnd(slots.psu, PSU_SOCKET.atx24, 5.5));
       }
-      psuEnd(slots.psu, PSU_SOCKET.atx24, 5.5);
       break;
     }
     case 'eps': {
@@ -90,7 +153,7 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
       run([19, 10, 9], [x, y, Z(17.5)], [0, 0, 20], [
         [x, y, Z(22)], [x, y + 8, Z(28)], [x, lay.topCut.y, Z(12)], [x, lay.topCut.y, behind],
       ], 4);
-      psuEnd(slots.psu, PSU_SOCKET.eps, 4);
+      fromTop(x, LANE.eps, 4, psuEnd(slots.psu, PSU_SOCKET.eps, 4));
       break;
     }
     case 'gpu': {
@@ -107,7 +170,7 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
           [land, lay.shroudTopY + 2, cutZ + 8],
           [land, underShroud, cutZ],
         ], 4);
-        psuEnd(slots.psu, PSU_SOCKET.gpu + i * 2, 4);
+        psuEnd(slots.psu, PSU_SOCKET.gpu + i * 2, 4, [land, underShroud, cutZ]);
       });
       break;
     }
@@ -127,6 +190,7 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
     case 'sata': {
       const mount = cable.target ? ctx.mounts.get(cable.target) : null;
       const bay = lay.bays[mount?.kind === 'bay' ? mount.index : 0] ?? lay.bays[0];
+      let power: P3 | undefined;
       if (bay) {
         const edge = bay.z - 36;
         const land = clampCut(bay.x);
@@ -138,6 +202,7 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
           [bay.x + 10, bay.y + 3, edge - 6], [bay.x + 10, bay.y + 8, edge - 24],
           [land + 8, bay.y + 3, cutZ + 7], [land + 8, underShroud, cutZ],
         ], 2.6);
+        power = [land + 8, underShroud, cutZ];
       }
       const port = bl.sata;
       const [x, y] = [X(port.u), Y(port.v)];
@@ -145,7 +210,8 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
       run([8, 12, 5], [x + 1, y, Z(10.5)], [0, 0, 14], [
         [x + 1, y, Z(14)], [x + 10, y - 2, Z(22)], [grommet.x, grommet.y, Z(8)], [grommet.x, grommet.y, behind],
       ], 2, M.cableData);
-      psuEnd(slots.psu, PSU_SOCKET.sata, 2.6);
+      fromGrommet(grommet, LANE.sata, 2, null, M.cableData);
+      psuEnd(slots.psu, PSU_SOCKET.sata, 2.6, power);
       break;
     }
     case 'front': {
@@ -161,6 +227,13 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
           : [[x + dx, y, Z(14)], [x + dx, y - 5, Z(19)], [land + dx, lay.shroudTopY + 1, cutZ + 6],
             [land + dx, underShroud, cutZ]];
         run([11, 5, 6], plug, [0, 0, 14], points, 1.6);
+        // From the ports on the roof: down the front edge behind the tray, into the chamber
+        const fx = lay.frontInner - 22 + dx * 0.6;
+        hidden([
+          [fx - 30, lay.H - 10, zb], [fx - 6, lay.H - 22, zb], [fx, lay.H - 60, zb],
+          [fx, chamber.y1 + 60, zb], [(fx + chamber.x1) / 2, chamber.y1 + 8, zb],
+          [chamber.x1 - 12 + dx * 0.5, chamber.y1 - 12, zb + 3], [chamber.x1 - 18 + dx * 0.5, chamber.y1 - 20, lay.trayZ + 6],
+        ], 1.6);
       }
       break;
     }
@@ -185,6 +258,7 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
         );
         reveal(item.tube, seg(p, 0.62 + i * each, 0.97));
       });
+      for (const item of backs) reveal(item, seg(p, 0.66, 0.99));
     },
   };
 }

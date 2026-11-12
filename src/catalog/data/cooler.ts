@@ -168,4 +168,59 @@ export const COOLERS: CoolerPart[] = [
     height: 58, // not published; same block as the 240 RS, so its block and hose estimates carry over
     sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851'],
     look: { block: 'square', blockSize: 72, cap: 'disc', hose: 14, blades: 7 } },
+  { id: 'thermalright-phantom-spirit-120-evo', category: 'cooler', brand: 'Thermalright', name: 'Phantom Spirit 120 EVO',
+    sku: 'Phantom Spirit 120 EVO', source: 'https://www.thermalright.com/product/phantom-spirit-120-evo/',
+    kind: 'air', height: 157, width: 125,
+    depth: 135, // derived: the 110 mm heatsink plus a 25 mm front fan
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851', 'LGA1200'], fanSize: 120, fans: 2, towers: 2,
+    // Stacks, gap, memory cut-back and the towers' 8 mm offset are measured on Thermalright's dimension drawing.
+    // Each tower wears its own ridged cover over the pipe ends; drawn as plain plates.
+    look: { pipes: 7, stack: [40, 40], top: 'plate', fins: 'plain', cutaway: [22, 10], offset: 8, fanFrame: 'square', blades: 9, clips: true } },
+  { id: 'thermalright-royal-pretor-130', category: 'cooler', brand: 'Thermalright', name: 'Royal Pretor 130',
+    sku: 'Royal Pretor 130', source: 'https://www.thermalright.com/product/royal-pretor-130/',
+    kind: 'air', height: 158, width: 130,
+    depth: 140, // derived: the 112 mm heatsink plus the 28 mm front fan
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851', 'LGA1200'], fanSize: 130, fans: 2, towers: 2,
+    // A 130 x 28 mm fan in front and a 120 x 28 mm one between the towers (both models are on the spec page).
+    // Stacks (38, 39) and the cut under each tower's outer face are measured on Thermalright's dimension drawing;
+    // its gap is about 35 mm, drawn at 30.
+    look: { pipes: 6, stack: [38, 39], top: 'plate', fins: 'plain', cutaway: [13, 10], fanDepths: [28, 28],
+      fanSizes: [130, 120], fanFrame: 'square', blades: 7, clips: true } },
+  { id: 'scythe-mugen-6', category: 'cooler', brand: 'Scythe', name: 'Mugen 6', sku: 'SCMG-6000',
+    source: 'https://www.scythe.co.jp/category/product/cpu-cooler/air-cooling/high-end/scmg-6000/',
+    // 154 x 106 published (fan and clips included). Width is the fins' 130 mm from Scythe's top-view
+    // drawing (70 + 60 either side of the base); the published 132 takes in the fan clips.
+    kind: 'air', height: 154, width: 130, depth: 106,
+    // Scythe's page lists Intel 1200/1700 and AM4/AM5; LGA1851 is not on it.
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1200'], fanSize: 120, fans: 1, towers: 1,
+    // 80 mm fins (published) and a 26 mm fan (published) = 106. The fins sit 5 mm off the base toward the top of
+    // the board (Scythe's 70 / 60 mm drawing) and are set back along the airflow by an amount Scythe does not print:
+    look: { pipes: 6, stack: [80], top: 'bare', fins: 'plain', cutaway: [0, 0], offset: 5,
+      back: 6, // estimate from Scythe's side photo against the 80 mm stack
+      fanDepths: [26], fanFrame: 'square', blades: 9, clips: true } },
+  { id: 'arctic-freezer-36-s', category: 'cooler', brand: 'Arctic', name: 'Freezer 36-S', sku: 'ACFRE00194A',
+    source: 'https://www.arctic.de/en/Freezer-36-S/ACFRE00194A',
+    // Depth is the heatsink and fan on Arctic's top-view drawing (77 mm); its 88 mm figure takes in the mounting bar.
+    kind: 'air', height: 156, width: 126, depth: 77,
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851'], fanSize: 120, fans: 1, towers: 1,
+    // One P12 Pro in front only. Copper pipe ends stand bare above the top fin; wire clips hold the fan, as its photos show.
+    look: { pipes: 4,
+      stack: [52], // derived: 77 mm less the 25 mm fan
+      top: 'bare', fins: 'plain', cutaway: [0, 0], fanFrame: 'square', blades: 5, clips: true } },
+  { id: 'arctic-liquid-freezer-iii-pro-360', category: 'cooler', brand: 'Arctic', name: 'Liquid Freezer III Pro 360',
+    sku: 'ACFRE00180A', source: 'https://www.arctic.de/en/Liquid-Freezer-III-Pro-360/ACFRE00180A',
+    kind: 'aio', radiator: { size: 360, length: 398, width: 120, thickness: 38 },
+    fanSize: 120, fans: 3, height: 68.5,
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851'],
+    // Every figure is on Arctic's spec sheet drawing: a 91 mm round head with a vaned ring over a 60 mm VRM fan.
+    look: { block: 'round', blockSize: 91, cap: 'vanes', hose: 12.4, blades: 5 } },
+  { id: 'noctua-nl-lc1-36', category: 'cooler', brand: 'Noctua', name: 'NL-LC1-36', sku: 'NL-LC1-36',
+    source: 'https://www.noctua.at/en/products/nl-lc1-36/specifications',
+    kind: 'aio', radiator: { size: 360, length: 399.5, width: 120, thickness: 30 },
+    fanSize: 120, fans: 3, height: 70,
+    // Noctua also lists LGA1954, which the schema has no name for.
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851'],
+    // A round pump inside a ribbed noise absorber with a metal logo disc on top. The absorber is 88.6 mm across
+    // (88.6 x 74.9 mm, flattened on the hose side) in Noctua's public CAD model; the logo disc is 48 mm.
+    look: { block: 'round', blockSize: 88, cap: 'disc', hose: 12.5, blades: 9 } },
 ];

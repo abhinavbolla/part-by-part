@@ -73,4 +73,30 @@ export const PSUS: PsuPart[] = [
     wattage: 1200, formFactor: 'ATX', length: 170, // datasheet says 170 mm, product page 160 mm; the longer is used
     modular: 'full',
     connectors: { atx24: 1, eps8: 2, pcie8: 3, hpwr16: 1, sata: 18 } },
+  // be quiet! lists one 4+4-pin and one separate 4-pin CPU plug; only the 4+4 is counted.
+  // SATA x5 is read as plugs, as for the Pure Power 12 M 650W already in psu.ts.
+  { id: 'be-quiet-pure-power-13-m-650', category: 'psu', brand: 'be quiet!', name: 'Pure Power 13 M 650W', sku: 'BP025EU',
+    source: 'https://www.bequiet.com/en/powersupply/5935',
+    look: { switch: true, grille: 'hex', fan: 120 },
+    wattage: 650, formFactor: 'ATX', length: 160, modular: 'full',
+    connectors: { atx24: 1, eps8: 1, pcie8: 2, hpwr16: 1, sata: 5 } },
+  // Native 12V-2x6 socket on the unit. The four 8-pin sockets are shared by
+  // the two CPU cables and the two dual-plug PCIe cables.
+  { id: 'cooler-master-mwe-gold-850-v3', category: 'psu', brand: 'Cooler Master', name: 'MWE Gold 850 V3 ATX 3.1', sku: 'MPX-8503-AFAG-2BUV',
+    source: 'https://www.coolermaster.com/en-global/products/mwe-gold-850-v3-atx-3-1.html',
+    look: { switch: true, grille: 'hex', fan: 120 },
+    wattage: 850, formFactor: 'ATX', length: 160, modular: 'full',
+    connectors: { atx24: 1, eps8: 2, pcie8: 4, hpwr16: 1, sata: 6 } },
+  { id: 'corsair-rm850x-2024', category: 'psu', brand: 'Corsair', name: 'RM850x', sku: 'CP-9020270-NA',
+    source: 'https://www.corsair.com/us/en/p/psu/cp-9020270-na/rm850x-fully-modular-low-noise-atx-power-supply-cp-9020270-na',
+    look: { switch: true, grille: 'tri', fan: 140 },
+    wattage: 850, formFactor: 'ATX', length: 160, modular: 'full',
+    connectors: { atx24: 1, eps8: 2, pcie8: 3, hpwr16: 1, sata: 8 } },
+  // The rear is perforated in vertical bands of round holes, drawn as the hex
+  // pattern. SATA x13 is read as plugs.
+  { id: 'be-quiet-dark-power-14-1000', category: 'psu', brand: 'be quiet!', name: 'Dark Power 14 1000W', sku: 'BP020EU',
+    source: 'https://www.bequiet.com/en/powersupply/5789',
+    look: { switch: true, grille: 'hex', fan: 135 },
+    wattage: 1000, formFactor: 'ATX', length: 175, modular: 'full',
+    connectors: { atx24: 1, eps8: 2, pcie8: 4, hpwr16: 1, sata: 13 } },
 ];

@@ -15,6 +15,8 @@
   --ok: #15803d;
   --bad: #dc2626;
   --live: #ff5a1f;
+  --ink-hover: #2a2a30; /* a filled ink button under the pointer */
+  --quick: .12s;       /* how long a control takes to answer the pointer */
   --din: "DIN Alternate", Bahnschrift, "Roboto Condensed", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
@@ -42,7 +44,7 @@ body {
 }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #view.orbit { cursor: grabbing; }
-button { font: inherit; color: inherit; cursor: pointer; }
+button { font: inherit; color: inherit; cursor: pointer; transition: background-color var(--quick), border-color var(--quick), color var(--quick); }
 a { color: inherit; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 [hidden] { display: none !important; }
@@ -73,6 +75,8 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
   -webkit-user-select: text;
 }
 #search::placeholder { color: var(--faint); }
+#search { transition: border-color var(--quick); }
+@media (hover: hover) { #search:hover { border-color: var(--faint); } }
 #search:focus { outline: none; border-color: var(--ink); }
 #tray footer { padding: 9px var(--gutter); border-top: 1px solid var(--rule); color: var(--mute); font-size: 12.5px; }
 @media (hover: none), (pointer: coarse) { #tray footer { display: none; } }
@@ -80,7 +84,7 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 
 .crumbs { margin: 0; padding: 13px var(--gutter) 11px; font-size: 13px; color: var(--mute); }
 .crumbs a { color: var(--ink); text-decoration: none; padding: 6px 0; }
-.crumbs a:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (hover: hover) { .crumbs a:hover { text-decoration: underline; text-underline-offset: 3px; } }
 .crumbs span { margin: 0 8px; color: var(--faint); }
 
 /* ---- the kinds of part ---------------------------------------------------- */
@@ -96,7 +100,12 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 .cur { display: block; font-size: 12.5px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .catlink.in .cur { color: var(--ink-2); }
 .catlink.next .cur::before { content: "Next:"; margin-right: .35em; color: var(--ink); font-weight: 600; }
-@media (hover: hover) { .catlink:hover, .open:hover, .hit:hover { background: var(--wash); } }
+/* A row answers the pointer as one surface, edge to edge: the part and the
+   button beside it. The button stays a button on it, and fills when it is the
+   thing under the pointer. Pressing a row darkens it a step. */
+.catlink, .hit, .rows > .card { transition: background-color var(--quick); }
+@media (hover: hover) { .catlink:hover, .hit:hover, .rows > .card:hover { background: var(--wash); } }
+.catlink:active, .hit:active, .rows > .card:has(.open:active) { background: var(--rule); }
 .catlink:focus-visible, .open:focus-visible, .hit:focus-visible { outline-offset: -2px; }
 
 /* ---- lists ------------------------------------------------------------------ */
@@ -114,8 +123,13 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
   background: var(--paper);
   font-size: 13px;
 }
-@media (hover: hover) { .facet button:hover { border-color: var(--ink); } }
 .facet button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+@media (hover: hover) {
+  .facet button:hover { border-color: var(--ink); background: var(--wash); }
+  .facet button[aria-pressed="true"]:hover { background: var(--ink-hover); border-color: var(--ink-hover); }
+}
+.facet button:active { background: var(--rule); }
+.facet button[aria-pressed="true"]:active { background: var(--ink-2); border-color: var(--ink-2); }
 .hint { margin: 0; padding: 9px var(--gutter); border-bottom: 1px solid var(--rule); background: var(--wash); font-size: 13px; color: var(--ink-2); }
 .none { margin: 0; padding: 18px var(--gutter); color: var(--mute); }
 
@@ -147,12 +161,17 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
   white-space: nowrap;
 }
 @media (hover: hover) { .act:hover { background: var(--ink); color: #fff; } }
-.card.in > .act, .card.no > .act, .card.wait > .act { border-color: var(--rule); color: var(--mute); font-weight: 500; }
+.act:active { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
+/* Fitted, or not able to go in: the button is quieter. Taking a part out is the
+   one red thing, and only under the pointer. */
+.card.in > .act, .card.no > .act, .card.wait > .act { border-color: var(--faint); color: var(--mute); font-weight: 500; }
 @media (hover: hover) {
   .card.in > .act:hover { background: var(--paper); border-color: var(--bad); color: var(--bad); }
-  .card.no > .act:hover, .card.wait > .act:hover { background: var(--paper); border-color: var(--rule); color: var(--mute); }
+  .card.no > .act:hover, .card.wait > .act:hover { background: var(--paper); border-color: var(--mute); color: var(--ink-2); }
 }
-.act:disabled { border-color: var(--rule); color: var(--faint); cursor: default; background: var(--paper); }
+.card.in > .act:active { background: var(--bad); border-color: var(--bad); color: #fff; }
+.card.no > .act:active, .card.wait > .act:active { background: var(--wash); border-color: var(--mute); color: var(--ink-2); }
+.act:disabled, .card > .act:disabled:hover, .card > .act:disabled:active { border-color: var(--rule); color: var(--faint); cursor: default; background: var(--paper); }
 .ico {
   flex: none;
   width: 20px;
@@ -181,7 +200,7 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 .card.no .shot img { opacity: .45; }
 .card.nudge { animation: nudge .32s; }
 @keyframes nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-@media (prefers-reduced-motion: reduce) { .card.nudge { animation: none; } .meter i { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .card.nudge { animation: none; } .meter i { transition: none !important; } :root { --quick: 0s; } }
 @media (hover: hover) and (pointer: fine) { .rows .open { cursor: grab; } }
 
 /* ---- a part's own page ----------------------------------------------------- */
@@ -190,17 +209,25 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 .detail .name { font: 700 23px/1.15 var(--din); letter-spacing: -.01em; margin: 0; overflow-wrap: anywhere; }
 .by { margin: 5px 0 14px; color: var(--mute); font-size: 13px; overflow-wrap: anywhere; }
 .detail > .act { display: block; width: 100%; margin: 0; height: 44px; background: var(--ink); color: #fff; font-size: 15px; }
-@media (hover: hover) { .detail > .act:hover { background: #2a2a30; } }
+@media (hover: hover) { .detail > .act:hover { background: var(--ink-hover); border-color: var(--ink-hover); } }
+.detail > .act:active { background: var(--ink-2); border-color: var(--ink-2); }
 .detail.in > .act, .detail.no > .act { background: var(--paper); color: var(--ink); border-color: var(--ink); font-weight: 600; }
-.detail.no > .act, .detail.wait > .act { background: var(--paper); border-color: var(--rule); color: var(--mute); }
-.detail > .act:disabled { background: var(--wash); border-color: var(--wash); color: var(--mute); }
+.detail.no > .act, .detail.wait > .act { background: var(--paper); border-color: var(--faint); color: var(--mute); }
+@media (hover: hover) {
+  .detail.in > .act:hover { background: var(--paper); border-color: var(--bad); color: var(--bad); }
+  .detail.no > .act:hover, .detail.wait > .act:hover { background: var(--paper); border-color: var(--mute); color: var(--ink-2); }
+}
+.detail.in > .act:active { background: var(--bad); border-color: var(--bad); color: #fff; }
+.detail.no > .act:active, .detail.wait > .act:active { background: var(--wash); border-color: var(--mute); color: var(--ink-2); }
+.detail > .act:disabled, .detail > .act:disabled:hover, .detail > .act:disabled:active { background: var(--wash); border-color: var(--wash); color: var(--mute); }
 .detail > .why { margin: 9px 0 0; font-size: 13px; }
 .specs { display: grid; grid-template-columns: auto 1fr; gap: 0 18px; margin: 18px var(--gutter) 0; border-top: 1px solid var(--rule); }
 .specs dt, .specs dd { margin: 0; padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .specs dt { color: var(--mute); font-size: 13px; }
 .specs dd { font-size: 13.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .src { margin: 14px var(--gutter) 18px; font-size: 13px; }
-.src a { color: var(--mute); text-underline-offset: 3px; }
+.src a { color: var(--mute); text-underline-offset: 3px; transition: color var(--quick); }
+@media (hover: hover) { .src a:hover { color: var(--ink); } }
 
 /* ---- the build --------------------------------------------------------------- */
 #status h2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; margin: 16px 0 6px; }
@@ -229,6 +256,7 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 .x { display: grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--mute); }
 .x svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 @media (hover: hover) { .x:hover { border-color: var(--bad); color: var(--bad); } }
+.x:active { background: var(--bad); border-color: var(--bad); color: #fff; }
 .load { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 13px 0 4px; font-size: 13.5px; }
 .load .v { font-variant-numeric: tabular-nums; }
 .meter { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--rule); overflow: hidden; }
@@ -236,6 +264,7 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 .meter i.hot { background: var(--bad); }
 #plugall { height: 28px; padding: 0 10px; border: 1px solid var(--ink); border-radius: 6px; background: var(--paper); font: 600 12.5px var(--sans); }
 @media (hover: hover) { #plugall:hover { background: var(--ink); color: #fff; } }
+#plugall:active { background: var(--ink-2); border-color: var(--ink-2); color: #fff; }
 .wire .open { padding: 8px 6px 8px 0; gap: 10px; align-items: flex-start; }
 .wire .ico { width: 17px; height: 17px; margin-top: 2px; }
 .wire .txt b { font: 600 14px/1.3 var(--sans); }
@@ -245,9 +274,12 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 .warn { margin-top: 12px; font-size: 13px; color: var(--bad); }
 .warn li { padding: 2px 0; }
 .power { width: 100%; height: 44px; margin-top: 16px; border: 1px solid var(--ink); border-radius: 6px; background: var(--ink); color: #fff; font: 700 16px var(--din); }
-@media (hover: hover) { .power:hover { background: #2a2a30; } }
-.power:disabled { background: var(--wash); color: var(--mute); border-color: var(--wash); cursor: default; }
+@media (hover: hover) { .power:hover { background: var(--ink-hover); border-color: var(--ink-hover); } }
+.power:active { background: var(--ink-2); border-color: var(--ink-2); }
 .power.on { background: var(--live); border-color: var(--live); }
+@media (hover: hover) { .power.on:hover { background: #e84e17; border-color: #e84e17; } }
+.power.on:active { background: #cf4412; border-color: #cf4412; }
+.power:disabled, .power:disabled:hover, .power:disabled:active { background: var(--wash); color: var(--mute); border-color: var(--wash); cursor: default; }
 .need { margin: 10px 0 0; font-size: 13px; color: var(--mute); }
 
 /* ---- the timeline ------------------------------------------------------------ */
@@ -268,8 +300,14 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
 }
 #timeline button { height: var(--tap); padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: none; font-size: 13.5px; white-space: nowrap; }
 @media (hover: hover) { #timeline button:hover:not(:disabled) { background: var(--wash); } }
+#timeline button:active:not(:disabled) { background: var(--rule); }
 #timeline button:disabled { color: var(--faint); cursor: default; }
-#look { border-color: var(--rule) !important; color: var(--ink-2); }
+/* The two that change how the machine is shown */
+#timeline #look, #timeline #back { border-color: var(--rule); color: var(--ink-2); }
+@media (hover: hover) { #timeline #look:hover, #timeline #back:hover { border-color: var(--faint); } }
+#timeline #back[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+@media (hover: hover) { #timeline #back[aria-pressed="true"]:hover { background: var(--ink-hover); border-color: var(--ink-hover); } }
+#timeline #back[aria-pressed="true"]:active { background: var(--ink-2); border-color: var(--ink-2); }
 #scrub { flex: 1; min-width: 48px; margin: 0 6px; accent-color: var(--ink); height: 3px; }
 #count { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--mute); min-width: 44px; text-align: center; white-space: nowrap; }
 
@@ -300,6 +338,8 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
    Portrait phone: machine above, one panel below, Parts and Build as tabs.   */
 #tabs { position: fixed; z-index: 2; background: var(--paper); align-items: stretch; height: var(--tabs); border-bottom: 1px solid var(--rule); }
 #tabs button { flex: 1; border: 0; border-bottom: 2px solid transparent; background: none; font: 700 15px var(--din); color: var(--mute); }
+@media (hover: hover) { #tabs button:hover { color: var(--ink); } }
+#tabs button:active { background: var(--wash); }
 #tabs button[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--ink); }
 #tabs #sheet { flex: none; width: 52px; border-left: 1px solid var(--rule); border-bottom: 0; display: none; }
 #sheet svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
@@ -338,6 +378,8 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
   :root { --sheet: 46dvh; --gutter: 14px; --dock: bottom; }
   body.tall { --sheet: 66dvh; }
   body.tall #timeline { display: none; }
+  #count, #back .more { display: none; }
+  #scrub { min-width: 32px; margin: 0 4px; }
   #tabs { display: flex; left: 0; right: 0; bottom: var(--sheet); border-top: 1px solid var(--rule); }
   #tabs #sheet { display: grid; place-items: center; }
   #tray, #status { left: 0; right: 0; top: auto; bottom: 0; width: auto; height: var(--sheet); border: 0; }
@@ -345,7 +387,7 @@ h2 { font: 700 15px/1.2 var(--din); margin: 0; }
   .detail { display: flex; flex-direction: column; align-items: stretch; }
   .detail .figure { order: 1; margin: 14px 0 0; }
   #timeline { left: 8px; right: 8px; bottom: calc(var(--sheet) + var(--tabs) + 8px); max-width: none; }
-  #timeline button { padding: 0 8px; }
+  #timeline button { padding: 0 7px; }
   #hud { left: 8px; top: 8px; }
   #tray header { padding: 9px var(--gutter); }
   h1 { font-size: 17px; }

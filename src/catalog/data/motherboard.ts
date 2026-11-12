@@ -555,4 +555,274 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       battery: [30, 187],
     },
   },
+  // Positions in `look` are read off each maker's top-down photo and manual layout drawing,
+  // to within a few millimetres; heatsink heights (`tall`) are estimates throughout.
+  {
+    id: 'msi-mag-b850-tomahawk-max-wifi', category: 'motherboard', brand: 'MSI', name: 'MAG B850 Tomahawk Max WiFi',
+    sku: 'MAG B850 TOMAHAWK MAX WIFI',
+    source: 'https://www.msi.com/Motherboard/MAG-B850-TOMAHAWK-MAX-WIFI/Specification',
+    rearIo: [['button', 'button'], ['hdmi'], ['usbA', 'usbC'], ['usbA', 'usbC'], ['usbA', 'usbA', 'usbA', 'usbA'], ['lan', 'usbA', 'usbC'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical']],
+    socket: 'AM5', chipset: 'B850', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 110, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // Three full-length slots: PCI_E1 x16, PCI_E2 x1 and PCI_E3 x4.
+    sataPorts: 4, pcieX16Slots: 3, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [129, 91],
+      eps: [[48, 7], [67, 7]],
+      sinks: [
+        { kind: 'io', at: [-6, 0, 41, 159], tall: 42, tone: 'dark', top: 'flat', cuts: [['tr', 20]] },
+        { kind: 'vrm', at: [41, 20, 76, 149], tall: 32, tone: 'dark', top: 'slashes' },
+        { kind: 'vrm', at: [72, 0, 168, 24], tall: 28, tone: 'dark', top: 'flat' },
+        { kind: 'm2', at: [21, 158, 160, 180], tall: 10, tone: 'dark', top: 'flat', cuts: [['bl', 8]], covers: [0] },
+        // One plate over the second and third sockets
+        { kind: 'm2', at: [63, 197, 161, 240], tall: 10, tone: 'dark', top: 'flat', covers: [1, 2] },
+        { kind: 'm2', at: [63, 257, 161, 281], tall: 10, tone: 'dark', top: 'flat', covers: [3] },
+        // The tall chipset heatsink beside the slots, in three panels
+        { kind: 'chipset', at: [161, 182, 229, 289], tall: 12, tone: 'dark', top: 'groovesAcross' },
+      ],
+      slots: [{ row: 3, size: 'x16', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[148, 167, -1], [148, 206, -1], [148, 232, -1], [148, 268, -1]],
+      sataEdge: 4, sataAt: 216,
+    },
+  },
+  {
+    id: 'asus-rog-crosshair-x870e-hero', category: 'motherboard', brand: 'ASUS',
+    name: 'ROG Crosshair X870E Hero', sku: 'ROG CROSSHAIR X870E HERO',
+    source: 'https://rog.asus.com/motherboards/rog-crosshair/rog-crosshair-x870e-hero/spec/',
+    rearIo: [['button', 'button'], ['hdmi'], ['usbA', 'usbC'], ['usbA', 'usbA', 'usbA', 'usbC'], ['lan', 'usbA', 'usbC'], ['lan', 'usbA', 'usbC'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical']],
+    socket: 'AM5', chipset: 'X870E', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // Eight fan headers counts the W_PUMP+ header with CPU, CPU_OPT, AIO_PUMP and four chassis.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [129, 90],
+      eps: [[51, 7], [71, 7]],
+      sinks: [
+        // The tall port cover and the heatsink beside it are one piece; split so the CPU power sockets stay clear
+        { kind: 'io', at: [-9, 0, 44, 156], tall: 45, tone: 'dark', top: 'flat', cuts: [['tr', 15]] },
+        { kind: 'vrm', at: [44, 14, 70, 152], tall: 34, tone: 'dark', top: 'flat', cuts: [['tr', 14]] },
+        { kind: 'vrm', at: [79, 0, 176, 25], tall: 30, tone: 'dark', top: 'slashes' },
+        { kind: 'm2', at: [21, 155, 150, 175], tall: 10, tone: 'dark', top: 'flat', covers: [0] },
+        // The raised tab at the right end of the big plate, beside the graphics slot
+        { kind: 'm2', at: [150, 180, 229, 195], tall: 10, tone: 'dark', top: 'flat' },
+        // One wide plate over both chipsets and the second and third sockets
+        { kind: 'm2', at: [0, 195, 229, 264], tall: 10, tone: 'dark', top: 'flat', covers: [1, 2] },
+        { kind: 'm2', at: [151, 263, 243, 280], tall: 10, tone: 'dark', top: 'flat', covers: [3] },
+        { kind: 'm2', at: [17, 279, 134, 300], tall: 10, tone: 'dark', top: 'flat', covers: [4] },
+      ],
+      slots: [{ row: 4, size: 'x16', steel: false }],
+      m2: [[60, 167, 1], [131, 247, -1], [143, 247, 1], [157, 273, 1], [131, 289, -1]],
+      sataEdge: 4, sataAt: 200,
+      // Left where the photo shows it; moved down with the slots it would overhang the board's edge
+      battery: [216, 294],
+    },
+  },
+  {
+    id: 'asrock-b850-steel-legend-wifi', category: 'motherboard', brand: 'ASRock',
+    name: 'B850 Steel Legend WiFi', sku: 'B850 Steel Legend WiFi',
+    source: 'https://www.asrock.com/mb/AMD/B850%20Steel%20Legend%20WiFi/index.asp#Specification',
+    rearIo: [['hdmi'], ['antenna'], ['antenna'], ['button'], ['usbA', 'usbA', 'usbA', 'usbA'], ['usbA', 'usbA', 'usbA', 'usbA'], ['usbC'], ['lan', 'usbA', 'usbC'], ['audio', 'audio', 'optical']],
+    socket: 'AM5', chipset: 'B850', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // The four SATA ports come from an ASMedia ASM1061.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 6,
+    look: {
+      socket: [131, 95],
+      eps: [[48, 7], [67, 7]],
+      sinks: [
+        { kind: 'io', at: [-6, 0, 49, 150], tall: 42, tone: 'light', top: 'flat', cuts: [['tr', 23]] },
+        { kind: 'vrm', at: [49, 21, 83, 150], tall: 32, tone: 'light', top: 'groovesDown' },
+        { kind: 'vrm', at: [76, 0, 177, 33], tall: 28, tone: 'light', top: 'flat' },
+        { kind: 'm2', at: [23, 159, 149, 181], tall: 10, tone: 'light', top: 'groovesAcross', covers: [0] },
+        { kind: 'chipset', at: [168, 183, 231, 255], tall: 12, tone: 'light', top: 'flat', cuts: [['tl', 20]] },
+        // The "M.2 Armor" plate across the board over the third and fourth sockets
+        { kind: 'm2', at: [23, 257, 230, 283], tall: 10, tone: 'light', top: 'slashes', covers: [2, 3] },
+      ],
+      slots: [{ row: 5, size: 'x16', steel: false }],
+      m2: [[122, 168, -1], [122, 242, -1], [209, 266, -1], [122, 266, -1]],
+      sataEdge: 4, sataAt: 235,
+      battery: [70, 213],
+    },
+  },
+  {
+    id: 'asus-rog-strix-b850-i-gaming-wifi', category: 'motherboard', brand: 'ASUS',
+    name: 'ROG Strix B850-I Gaming WiFi', sku: 'ROG STRIX B850-I GAMING WIFI',
+    source: 'https://rog.asus.com/motherboards/rog-strix/rog-strix-b850-i-gaming-wifi/spec/',
+    rearIo: [['button'], ['usbA', 'usbA', 'hdmi'], ['vent'], ['usbA', 'usbA', 'usbA', 'usbC'], ['lan', 'usbA', 'usbC'], ['antenna'], ['antenna'], ['audio', 'button'], ['audio', 'button'], ['audio', 'optical']],
+    socket: 'AM5', chipset: 'B850', formFactor: 'Mini-ITX', ramType: 'DDR5', ramSlots: 2, maxRamGb: 128,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    sataPorts: 2, pcieX16Slots: 1, epsConnectors: 1, fanHeaders: 4,
+    look: {
+      socket: [88, 71],
+      eps: [[16, 6]],
+      sinks: [
+        { kind: 'io', at: [-8, 9, 25, 161], tall: 45, tone: 'dark', top: 'flat', cuts: [['br', 24]] },
+        { kind: 'vrm', at: [25, 12, 50, 110], tall: 32, tone: 'dark', top: 'groovesDown' },
+        // The chipset heatsink, and over it the plate covering the M.2 drive on the raised audio board
+        { kind: 'chipset', at: [9, 131, 137, 157], tall: 14, tone: 'dark', top: 'flat' },
+        { kind: 'm2', at: [9, 131, 137, 157], tall: 24, tone: 'dark', top: 'flat', cuts: [['tl', 14], ['tr', 8]], covers: [0] },
+      ],
+      slots: [],
+      // The raised board's height is an estimate (as on the B650E-I). The second socket is on the back of
+      // the real board; it is drawn on the front so the drive can be seen going in.
+      m2: [[114, 144, -1, 14], [52, 114, 1]],
+      sataEdge: 0,
+    },
+  },
+  {
+    id: 'msi-mag-b860-tomahawk-wifi', category: 'motherboard', brand: 'MSI', name: 'MAG B860 Tomahawk WiFi',
+    sku: 'MAG B860 TOMAHAWK WIFI',
+    source: 'https://www.msi.com/Motherboard/MAG-B860-TOMAHAWK-WIFI/Specification',
+    rearIo: [['button', 'button'], ['usbC'], ['dp', 'hdmi'], ['usbA', 'usbA', 'usbA', 'usbA'], ['lan', 'usbA', 'usbA'], ['usbA', 'usbA', 'usbC'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical']],
+    socket: 'LGA1851', chipset: 'B860', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 110, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // PCI_E3 is full length but runs at x4. Both CPU power sockets sit above the memory.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 7,
+    look: {
+      socket: [136, 86],
+      eps: [[191, 7], [210, 7]],
+      sinks: [
+        // Heights are estimates; a photo from above does not show them
+        { kind: 'io', at: [-8, 0, 40, 153], tall: 40, tone: 'dark', top: 'flat', cuts: [['tr', 16]] },
+        { kind: 'vrm', at: [40, 14, 81, 150], tall: 32, tone: 'dark', top: 'slashes', cuts: [['tl', 14]] },
+        { kind: 'vrm', at: [81, 0, 181, 34], tall: 28, tone: 'dark', top: 'flat', cuts: [['br', 18]] },
+        { kind: 'm2', at: [30, 161, 165, 182], tall: 10, tone: 'dark', top: 'flat', cuts: [['tr', 8]], covers: [0] },
+        { kind: 'chipset', at: [156, 182, 232, 262], tall: 12, tone: 'dark', top: 'slashes' },
+        // One long plate printed 02 and 03 over both lower sockets
+        { kind: 'm2', at: [20, 264, 232, 282], tall: 10, tone: 'dark', top: 'flat', covers: [1, 2] },
+      ],
+      slots: [{ row: 3, size: 'x1', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[130, 165, -1], [31, 268, 1], [219, 268, -1]],
+      sataEdge: 4, sataAt: 243,
+      battery: [27, 229],
+    },
+  },
+  {
+    id: 'asus-rog-maximus-z890-hero', category: 'motherboard', brand: 'ASUS',
+    name: 'ROG Maximus Z890 Hero', sku: 'ROG MAXIMUS Z890 HERO',
+    source: 'https://rog.asus.com/motherboards/rog-maximus/rog-maximus-z890-hero/spec/',
+    rearIo: [['button', 'button'], ['hdmi'], ['lan', 'usbA', 'usbC'], ['lan', 'usbA', 'usbC'], ['usbA', 'usbA', 'usbA', 'usbA'], ['usbA', 'usbA', 'usbC'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical']],
+    socket: 'LGA1851', chipset: 'Z890', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 110, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // fanHeaders counts the seven 4-pin headers plus the W_PUMP+ header. Also has a SlimSAS connector, not drawn.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [134, 87],
+      eps: [[54, 6], [75, 6]],
+      sinks: [
+        // Heights are estimates; a photo from above does not show them
+        { kind: 'io', at: [-7, 0, 59, 151], tall: 42, tone: 'dark', top: 'flat', cuts: [['tr', 38]] },
+        { kind: 'vrm', at: [59, 10, 83, 150], tall: 34, tone: 'dark', top: 'groovesAcross' },
+        { kind: 'vrm', at: [83, 0, 183, 32], tall: 30, tone: 'dark', top: 'slashes' },
+        // The finned bar below the socket
+        { kind: 'vrm', at: [83, 134, 183, 151], tall: 20, tone: 'dark', top: 'slashes' },
+        { kind: 'm2', at: [10, 158, 151, 182], tall: 10, tone: 'dark', top: 'flat', cuts: [['tl', 10]], covers: [0] },
+        // One wide plate over the four middle sockets, and the patterned chipset plate beside it
+        { kind: 'm2', at: [12, 195, 150, 259], tall: 10, tone: 'dark', top: 'flat', covers: [1, 2, 3, 4] },
+        { kind: 'chipset', at: [152, 185, 231, 259], tall: 10, tone: 'dark', top: 'slashes' },
+        { kind: 'm2', at: [80, 259, 244, 285], tall: 10, tone: 'dark', top: 'flat', cuts: [['tl', 20]], covers: [5] },
+        // The audio cover down the left edge
+        { kind: 'io', at: [-2, 192, 12, 298], tall: 10, tone: 'dark', top: 'flat' },
+      ],
+      slots: [{ row: 4, size: 'x1', steel: false }, { row: 5, size: 'x16', steel: false }],
+      m2: [[30, 165, 1], [41, 204, 1], [124, 226, -1], [124, 251, -1], [139, 247, 1], [157, 272, 1]],
+      sataEdge: 4, sataAt: 225,
+    },
+  },
+  {
+    id: 'asus-rog-strix-b860-f-gaming-wifi', category: 'motherboard', brand: 'ASUS',
+    name: 'ROG Strix B860-F Gaming WiFi', sku: 'ROG STRIX B860-F GAMING WIFI',
+    source: 'https://rog.asus.com/motherboards/rog-strix/rog-strix-b860-f-gaming-wifi/spec/',
+    rearIo: [['dp', 'hdmi'], ['usbA', 'usbA', 'usbA', 'usbA'], ['usbC'], ['lan', 'usbA', 'usbC'], ['usbA', 'usbA', 'button'], ['button'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical']],
+    socket: 'LGA1851', chipset: 'B860', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 110, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // The lower PCIe 4.0 slot is full length but runs at x4.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 7,
+    look: {
+      socket: [130, 87],
+      eps: [[49, 6], [68, 6]],
+      sinks: [
+        // Heights are estimates; a photo from above does not show them
+        { kind: 'io', at: [-8, 0, 50, 156], tall: 42, tone: 'dark', top: 'flat', cuts: [['br', 20]] },
+        { kind: 'vrm', at: [50, 26, 78, 145], tall: 34, tone: 'dark', top: 'groovesDown' },
+        { kind: 'vrm', at: [78, 0, 178, 37], tall: 28, tone: 'dark', top: 'slashes', cuts: [['tl', 10]] },
+        { kind: 'm2', at: [54, 155, 154, 177], tall: 10, tone: 'dark', top: 'flat', cuts: [['bl', 8]], covers: [0] },
+        { kind: 'chipset', at: [129, 192, 233, 228], tall: 10, tone: 'dark', top: 'flat', cuts: [['tl', 15]] },
+        { kind: 'm2', at: [15, 228, 233, 254], tall: 10, tone: 'dark', top: 'flat', covers: [1] },
+        { kind: 'm2', at: [15, 254, 233, 280], tall: 10, tone: 'dark', top: 'flat', covers: [2, 3] },
+      ],
+      slots: [{ row: 5, size: 'x16', steel: false }],
+      m2: [[58, 166, 1], [111, 243, -1], [140, 268, -1], [158, 268, 1]],
+      sataEdge: 4, sataAt: 222,
+      battery: [32, 218],
+    },
+  },
+  {
+    id: 'asrock-b860-steel-legend-wifi', category: 'motherboard', brand: 'ASRock',
+    name: 'B860 Steel Legend WiFi', sku: 'B860 Steel Legend WiFi',
+    source: 'https://www.asrock.com/mb/Intel/B860%20Steel%20Legend%20WiFi/index.asp#Specification',
+    rearIo: [['antenna'], ['antenna', 'button'], ['dp', 'hdmi'], ['usbA', 'usbC'], ['usbA', 'usbA'], ['usbA', 'usbA'], ['usbA', 'usbA'], ['lan', 'usbA', 'usbA'], ['audio', 'audio', 'optical']],
+    socket: 'LGA1851', chipset: 'B860', formFactor: 'ATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // PCIE2 is full length but runs at x2.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 8,
+    look: {
+      socket: [119, 86],
+      eps: [[50, 8], [68, 8]],
+      sinks: [
+        // Heights are estimates; a photo from above does not show them
+        { kind: 'io', at: [-6, 0, 53, 145], tall: 40, tone: 'light', top: 'flat', cuts: [['tr', 18]] },
+        { kind: 'vrm', at: [53, 14, 76, 145], tall: 34, tone: 'light', top: 'finsDown' },
+        { kind: 'vrm', at: [76, 0, 167, 28], tall: 30, tone: 'light', top: 'blocks' },
+        { kind: 'm2', at: [35, 154, 155, 178], tall: 10, tone: 'light', top: 'flat', covers: [0] },
+        { kind: 'chipset', at: [169, 190, 233, 252], tall: 14, tone: 'light', top: 'finsAcross' },
+        // The M.2 Armor plate over the two lower sockets; M2_2 is bare
+        { kind: 'm2', at: [17, 259, 229, 283], tall: 10, tone: 'light', top: 'flat', covers: [2, 3] },
+      ],
+      slots: [{ row: 5, size: 'x16', steel: false }],
+      m2: [[53, 163, 1], [116, 240, -1], [116, 268, -1], [209, 268, -1]],
+      sataEdge: 4, sataAt: 238,
+      battery: [106, 208],
+    },
+  },
 ];

@@ -6,6 +6,7 @@
 import { Group, Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 
 import type { CasePart } from '../../catalog/types.ts';
+import { easeInOut, easeOut, seg } from '../anim.ts';
 import { FRONT_DEPTH, PANEL, STANDOFF, STANDOFFS, boardLayout, type CaseLayout } from '../layout.ts';
 import { M, box, copies, cyl, fan, glowMat, prism, prismGeometry, rbox, ring } from '../kit.ts';
 
@@ -15,6 +16,8 @@ export interface CaseModel {
   glow: MeshStandardMaterial[];
   /** Takes out the slot covers a graphics card replaces: `rows` of them from position `first`. */
   openSlots(first: number, rows: number): void;
+  /** 0 fitted .. 1 off: the panel on the far side, behind the motherboard tray. */
+  backPanel(open: number): void;
 }
 
 type Look = NonNullable<CasePart['look']>;
@@ -137,7 +140,12 @@ export function buildCase(pcCase: CasePart, lay: CaseLayout): CaseModel {
   // ---- shell: floor, roof, far side, front ---------------------------------
   box(group, L, PANEL, W, M.caseOuter, 0, floorY + PANEL / 2, 0);
   box(group, L, PANEL, W, M.caseOuter, 0, H - PANEL / 2, 0);
-  box(group, L, bodyH, PANEL, M.caseOuter, 0, midY, -W / 2 + PANEL / 2);
+  // The far side is a panel of its own: it comes off to show the cables behind the tray
+  const panel = new Group();
+  box(panel, L, bodyH, PANEL, M.caseOuter);
+  const panelAt: [number, number, number] = [0, midY, -W / 2 + PANEL / 2];
+  panel.position.set(...panelAt);
+  group.add(panel);
 
   // The front: a body section, and on some cases a panel standing off it across a gap
   const panelT = look.frontGap > 0 ? 9 : 0;
@@ -263,6 +271,27 @@ export function buildCase(pcCase: CasePart, lay: CaseLayout): CaseModel {
   for (const spot of STANDOFFS) {
     cyl(group, 3, STANDOFF, M.brass, 'z', lay.board.x + spot.u, lay.board.y - spot.v, trayZ + STANDOFF / 2, true);
   }
+  // The tray's other face, seen with the far panel off: the same openings, the
+  // open end of the power-supply chamber, and straps over the cable run
+  const backZ = trayZ - 1.8;
+  box(group, 130, 120, 0.5, M.vent, lay.board.x + atx.socket.u, lay.board.y - atx.socket.v, backZ);
+  for (const grommet of lay.grommets) rbox(group, 14, 62, 1, 0.4, M.vent, grommet.x, grommet.y, backZ);
+  rbox(group, cutLen, 12, 1, 0.4, M.vent, lay.topCut.x0 + cutLen / 2, lay.topCut.y, backZ);
+  const { chamber } = lay;
+  box(group, chamber.x1 - chamber.x0, chamber.y1 - chamber.y0, 0.5, M.vent,
+    (chamber.x0 + chamber.x1) / 2, (chamber.y0 + chamber.y1) / 2, backZ);
+  const strap = (x: number, y: number, across: boolean): void => {
+    const [w, h] = across ? [12, 46] : [46, 12];
+    box(group, w, h, 1.2, M.black, x, y, trayZ - 16);
+    for (const side of [-1, 1]) {
+      box(group, across ? 12 : 1.2, across ? 1.2 : 12, 15, M.black,
+        x + (across ? 0 : side * 22.4), y + (across ? side * 22.4 : 0), trayZ - 8.5);
+    }
+  };
+  const trunkX = lay.grommets[0].x;
+  for (const dy of [-116, -206]) strap(trunkX, lay.board.y + dy, false);
+  strap(trunkX, (lay.grommets[2].y - 31 + chamber.y1) / 2, false);
+  strap((lay.topCut.x1 + trunkX) / 2 + 6, lay.topCut.y - 16, true);
 
   // ---- rear panel: one plate with the real openings cut through it ----------
   // Drawn in (z, y) and turned to face the back: the port opening, seven slots,
@@ -391,6 +420,13 @@ export function buildCase(pcCase: CasePart, lay: CaseLayout): CaseModel {
       covers.forEach((cover, i) => {
         cover.visible = !(i >= first && i < first + rows);
       });
+    },
+    backPanel(open) {
+      // It slides toward the rear to unhook, then comes away from the case
+      const away = easeInOut(seg(open, 0.22, 1));
+      panel.position.set(panelAt[0] - 18 * easeInOut(seg(open, 0, 0.3)), panelAt[1], panelAt[2] - 240 * away);
+      panel.scale.setScalar(0.55 + 0.45 * easeOut(seg(1 - open, 0, 0.2)));
+      panel.visible = open < 0.999;
     },
   };
 }

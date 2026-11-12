@@ -245,6 +245,10 @@ export interface CaseLayout {
   shroudCut: { x0: number; x1: number; z: number };
   /** 2.5-inch drive mounts on top of the shroud. */
   bays: { x: number; y: number; z: number }[];
+  /** How far the intake fans the case ships with stand in from the front's inner face; 0 without any. */
+  frontFans: number;
+  /** The opening in the tray under the shroud, where the power supply's cables pass to the back. */
+  chamber: { x0: number; x1: number; y0: number; y1: number };
 }
 
 export const PANEL = 3;
@@ -288,5 +292,12 @@ export function caseLayout(pcCase: CasePart): CaseLayout {
     topCut: { x0: boardX + 36, x1: boardX + 150, y: boardY + 15 },
     shroudCut: { x0: boardX + 120, x1: frontInner - 80, z: trayZ + 16 },
     bays,
+    frontFans: pcCase.includedFans.front.length ? 26 : 0,
+    chamber: {
+      x0: rearInner + 150,
+      x1: Math.min(frontInner - 60, rearInner + 330),
+      y0: floorY + PANEL + 8,
+      y1: shroudTopY - 8,
+    },
   };
 }
