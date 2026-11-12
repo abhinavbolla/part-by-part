@@ -1,0 +1,28 @@
+name: Wrong or missing part
+description: A figure is wrong, a part is drawn unlike the real one, or a part should be added.
+labels: [parts]
+body:
+  - type: input
+    id: part
+    attributes:
+      label: Which part
+      description: Its name as the site shows it, or the maker and model for one that is missing.
+      placeholder: Fractal Design North
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong or missing
+      description: The figure or detail in question, and what it should be.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: The maker's page
+      description: >-
+        A link to the maker's own product page, drawing or manual that shows it. Part data
+        only comes from the maker, not from other parts sites.
+    validations:
+      required: true

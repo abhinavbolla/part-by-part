@@ -87,6 +87,7 @@ npm run dev        # http://localhost:5173
 npm test           # rules, build state, page rendering, catalog drawing data
 npm run build
 npm run measure    # speed and interaction checks against the build
+npm run check:ui   # only the interaction checks, as CI runs them
 ```
 
 Add `?hud` to the address, or press `H`, for a live speed readout.
@@ -241,3 +242,11 @@ parts data as entered here.
   grant any right to those names or marks.
 - There are no third-party fonts, icons, images or 3D models in this
   repository: icons and parts are drawn in code.
+
+## Contributing
+
+Changes are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for how to run the
+checks and what a pull request needs, and the
+[code of conduct](CODE_OF_CONDUCT.md). `main` is protected, so every change
+lands through a pull request with passing CI. Report security problems
+privately, as [SECURITY.md](SECURITY.md) describes.

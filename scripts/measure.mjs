@@ -8,6 +8,11 @@
 //   --shots DIR    save screenshots of the build in progress
 //   --headed       show the browser window
 //   --verbose      print every sample
+//   --checks       only the interaction checks: one load, this machine's own
+//                  speed, no throttled profile. What CI runs; its timings mean
+//                  nothing there, only whether every check passes.
+//   --software     draw with Chrome's software renderer instead of the GPU
+//                  (always the case off macOS), for machines without one
 
 import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -22,10 +27,12 @@ const option = (name, fallback) => {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : fallback;
 };
-const RUNS = Number(option('--runs', 5));
+const RUNS = args.includes('--checks') ? 1 : Number(option('--runs', 5));
 const SHOTS = option('--shots', null);
 const HEADED = args.includes('--headed');
 const VERBOSE = args.includes('--verbose');
+const CHECKS = args.includes('--checks');
+const SOFTWARE = args.includes('--software') || process.platform !== 'darwin';
 
 if (!existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ is missing. Run `npm run build` first.');
@@ -413,7 +420,9 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: !HEADED,
-  args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal'],
+  args: SOFTWARE
+    ? ['--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+    : ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal'],
 });
 
 const size = (file) => {
@@ -440,7 +449,7 @@ console.log(`\nBrowser frame interval: ${round(beat, 1)} ms${beat > 20 ? '  (cap
 const late = beat * 1.25;
 
 let failed = false;
-for (const profile of PROFILES) {
+for (const profile of CHECKS ? PROFILES.slice(0, 1) : PROFILES) {
   const home = [];
   const deep = [];
   for (let i = 0; i < RUNS; i++) {
