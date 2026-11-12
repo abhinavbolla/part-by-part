@@ -8,9 +8,9 @@ come together.
 
 ## What works
 
-- **A catalog of 59 real parts** in the left panel: 4 cases, 8 motherboards,
-  11 processors, 8 coolers, 7 memory kits, 6 drives, 9 graphics cards and
-  6 power supplies. Each category is a list with filters, each part has its own
+- **A catalog of 118 real parts** in the left panel: 10 cases, 16 motherboards,
+  19 processors, 18 coolers, 13 memory kits, 12 drives, 18 graphics cards and
+  12 power supplies. Each category is a list with filters, each part has its own
   page with full specs and a link to the manufacturer, and there is a search box.
 - **"Only what fits my build"** filters a list with the same compatibility rules
   the case uses.
@@ -42,7 +42,7 @@ come together.
   drawing, made in the browser from the same model.
 - **Parts drawn from what they are:** processor lids differ by socket and
   memory shows its heat-spreader outline.
-- **Graphics cards modelled on the real ones:** each of the nine has its own
+- **Graphics cards modelled on the real ones:** each card has its own
   fans (size, blade count, whether a ring joins the blade tips), shroud outline
   and face, backplate (the opening past the end of the board, the window round
   the bracket behind the chip), the edge you see in the case (where the fins
@@ -54,20 +54,19 @@ come together.
   ones (one twin tower has a slimmer front tower and sits off-centre); tops are
   bare pipe ends, capped ends, a plate, a gridded cover or one lid over both
   towers; fins are cut back at the foot where the real ones clear memory; fans
-  carry their blade counts and wire clips. The two liquid coolers have their
-  own pump blocks: a rounded square with a disc on top, and a round head with a
-  ring of vanes.
-- **Boards modelled on the real ones:** each of the eight has its own port
+  carry their blade counts and wire clips. Liquid coolers have their own pump
+  blocks, round or a rounded square, with a disc on top or a ring of vanes.
+- **Boards modelled on the real ones:** each board has its own port
   cover, power-stage heatsinks, chipset plate and M.2 heatsinks where they sit
   on the real board, its own expansion slots on the slot grid, its M.2 sockets
   facing the way they really do, its CPU socket, CPU power sockets, SATA ports
   and coin cell in their places. One board leaves three M.2 sockets bare, one
   covers three with a single plate, and the Mini-ITX board carries a drive on
   a raised deck over its chipset.
-- **Cases modelled on the real ones:** each of the four has its own front
-  (wooden slats in a frame, a stood-off panel of triangular holes, round
-  perforation, fine mesh with the fans showing through), its own roof, port
-  row, feet, shroud and closed sections, taken from its maker's photos.
+- **Cases modelled on the real ones:** each case has its own front (wooden
+  slats in a frame, a stood-off panel of triangular holes, round perforation,
+  fine mesh with the fans showing through), its own roof, port row, feet,
+  shroud and closed sections, taken from its maker's photos.
 - **The back of the machine:** drag to turn the case all the way round. The
   rear panel has its real openings; the board's port block shows every port in
   the columns that board has them; a graphics card takes out the slot covers
@@ -114,7 +113,9 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
   when the category is opened, so the script stays the same size as the catalog
   grows.
 - **Idle means idle.** The scene draws a frame only when something moves, and
-  shaders and parts are prepared while the page is idle.
+  shaders and parts are prepared while the page is idle and nothing is moving.
+  A prepared part waits outside the scene until it is shown, so the size of
+  the catalog does not weigh on a frame.
 - **The lines are real geometry.** Every edge of every shape is a thin strip
   that always faces the screen at a fixed width and fades over its last pixel,
   so lines stay smooth and stay put while the view turns. Each edge knows the
@@ -164,8 +165,16 @@ frame after (median 10.1) and 8.1 to 9.5 ms before (median 8.8), and 8.3 to
 machine could not tell them apart more finely. The same build takes 967 draw
 calls where it took 1019, because a fan's blades are now one shape. A run of
 `npm run measure` on that busy machine still showed no late frames in 1030 and
-none drawn while idle; first paint was 40 ms and the first load 155 KB. The
-whole table has not been re-run on a quiet machine since.
+none drawn while idle; first paint was 40 ms and the first load 155 KB.
+
+Doubling the catalog to 118 parts showed up only on the throttled profile:
+parts prepared ahead of a click were kept hidden inside the scene, where every
+frame still walked them, and twice the parts meant about 160 late frames in
+850 where the smaller catalog had 40 in 990 (same machine, same busy hour).
+Hidden parts now wait outside the scene and nothing is prepared while
+something is moving; the same run then gave 1 late frame in 1028 throttled and
+none unthrottled. First load is unchanged at 155 KB, since part data is loaded
+per category. The whole table has not been re-run on a quiet machine since.
 
 The throttled column slows the CPU and network only; the GPU is still this
 machine's. Nothing has been measured on a phone or a low-end laptop, and only
@@ -174,7 +183,16 @@ Chrome has been run.
 ## Parts data
 
 Specs in `src/catalog/data` were entered by hand from each manufacturer's own
-product page on 11 November 2026, and every part records the page it came from.
+product page on 11 and 12 November 2026, and every part records the page it
+came from. The 59 parts added on the second day were each read a second time,
+independently, against the maker's page before they went in: sizes, clearances,
+connector counts, slot and socket counts, part numbers. That second reading
+found no wrong figure. It found two part numbers that were not the maker's own
+(a shop's code, and one missing its suffix) and two comments that claimed more
+than the maker's page says, all corrected. One card is entered 30 mm lower than
+its maker's printed height on purpose, because that figure appears to include
+the bracket; the data file says so.
+
 Every category but processors and drives also carries a `look` entry, read
 from the same pages' text and photos: what a case's front panel is and how it
 is perforated, the shape of a heat spreader's top, a card's fans, shroud,
@@ -197,6 +215,14 @@ drive can be seen going in. A cover over an M.2 socket swings up on a hinge
 here; the real ones unscrew and lift off. Small parts on a board that the
 catalog does not record (chokes, headers, the memory and 24-pin sockets) are in
 a usual arrangement for the board's size, not that board's own.
+
+Some real parts are left out because the drawing cannot do them justice yet:
+cases whose power supply is not under a shroud at the bottom rear, or whose
+front fans do not sit low; microATX boards whose graphics slot is in the top
+position; coolers that blow down at the board, sit back from the socket or
+carry a fan on both sides of one tower; cards with fans on both faces. A screen
+or mirror on a pump block is drawn as a plain disc, and a power supply's fan
+grille is the same rings and spokes on every unit.
 Where a maker does not print a value it is marked in the data file: for example
 AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model

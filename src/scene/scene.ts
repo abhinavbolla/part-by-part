@@ -427,7 +427,22 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   }
 
   /** Draws one frame in the current look. */
+  /**
+   * Parts prepared ahead of a click wait outside the scene. A hidden part left
+   * in it would still be walked on every frame and by every pointer pick, and
+   * with a large catalog there are many of them.
+   */
+  function attachShown(): void {
+    for (const model of models.values()) {
+      const group = model.group;
+      if (group.visible === (group.parent !== null)) continue;
+      if (group.visible) (model.frame === 'board' ? boardFrame : caseModel.group).add(group);
+      else group.removeFromParent();
+    }
+  }
+
   function draw(): void {
+    attachShown();
     renderer.info.reset();
     const buffer = renderer.getDrawingBufferSize(new Vector2());
     setEdgeView(buffer.x, buffer.y, renderer.getPixelRatio());
@@ -911,6 +926,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     model.setProgress(1, false);
     model.group.scale.setScalar(1);
     if (model.portrait) model.group.rotation.set(...model.portrait);
+    attachShown();
     const url = picture(model.group, w, h, scale);
     if (model.portrait) model.group.rotation.set(0, 0, 0);
     pose(item.id, was, false, true);
@@ -960,9 +976,10 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   function warm(steps: Step[]): void {
     const queue = [...steps];
     const step = (): void => {
-      const next = queue.shift();
-      if (!next) return;
-      if (!visitor) ensure(next);
+      if (!queue.length) return;
+      // Never while something is moving or being dragged: building a part
+      // takes a few milliseconds, and on a slow machine that is a late frame.
+      if (stats.settled && !visitor) ensure(queue.shift()!);
       whenIdle(step);
     };
     whenIdle(step);

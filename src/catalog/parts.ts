@@ -1,5 +1,5 @@
 // The catalog. Every entry was entered by hand from its manufacturer's own
-// product page (read 2026-11-11) and records that page in `source`. Values a
+// product page (read 2026-11-11 and 2026-11-12) and records that page in `source`. Values a
 // maker does not print are marked where they appear.
 
 import { CASES } from './data/case.ts';

@@ -373,10 +373,21 @@ function runSearch(): void {
     return;
   }
   if (beforeSearch === null) beforeSearch = panel.innerHTML;
-  const hits = entries.filter((entry) => {
-    const text = `${entry.n} ${entry.b} ${entry.s} ${CATEGORY_LABEL[entry.c]}`.toLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
+  // A part matches when every word typed is somewhere in its name, maker, specs
+  // or kind. Parts whose name or maker has the words as typed come first, so
+  // "990 pro" finds the 990 Pro ahead of a 9900X that is a processor.
+  const score = (entry: SearchEntry): number => {
+    const words = `${entry.n} ${entry.b}`.toLowerCase().split(/[^a-z0-9]+/);
+    return terms.reduce((sum, term) => sum + (words.includes(term) ? 2 : words.some((word) => word.startsWith(term)) ? 1 : 0), 0);
+  };
+  const hits = entries
+    .filter((entry) => {
+      const text = `${entry.n} ${entry.b} ${entry.s} ${CATEGORY_LABEL[entry.c]}`.toLowerCase();
+      return terms.every((term) => text.includes(term));
+    })
+    .map((entry, order) => ({ entry, order, rank: score(entry) }))
+    .sort((a, b) => b.rank - a.rank || a.order - b.order)
+    .map((hit) => hit.entry);
   const esc = (text: string): string => text.replace(/[&<>"]/g, (ch) => `&#${ch.charCodeAt(0)};`);
   panel.innerHTML = `<div class="page" data-kind="search"><p class="crumbs">${hits.length} ${hits.length === 1 ? 'part' : 'parts'}</p><div class="rows">${
     hits.map((entry) => `<a class="hit" data-nav href="/parts/${entry.c}/${entry.id}/"><svg class="ico"><use href="#i-${entry.c}"/></svg><span class="txt"><b>${esc(entry.n)}</b><i>${esc(entry.b)} · ${CATEGORY_LABEL[entry.c]}</i><span class="spec">${esc(entry.s)}</span></span></a>`).join('')
