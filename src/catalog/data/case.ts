@@ -226,4 +226,118 @@ export const CASES: CasePart[] = [
       shroud: 'vented', rearFan: 140, rearGrille: 'slots', rearVented: true, cableBar: false, pullTab: true,
     },
   },
+  {
+    id: 'lian-li-lancool-217', category: 'case', brand: 'Lian Li', name: 'Lancool 217', sku: 'LAN217X',
+    source: 'https://lian-li.com/product/lancool-217/',
+    dims: { length: 482, width: 238, height: 503 },
+    // The page also lists SSI-EEB up to 330 mm wide, which this schema has no name for.
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 380, maxCoolerHeight: 180,
+    // 220 mm with the power supply in its standard orientation; 180 mm turned 90 degrees.
+    psuFormFactors: ['ATX'], maxPsuLength: 220, expansionSlots: 7,
+    // Five fans ship fitted: two 170 mm front, one 140 mm rear, and two 120 mm
+    // standing on the shroud, which this schema has no place for.
+    includedFans: { front: [170, 170], top: [], rear: [140] },
+    // The spec table lists radiators for the top only (360/280/240).
+    radiators: { front: [], top: [240, 280, 360], rear: [] },
+    // Standard power-supply mode, one drive cage: two 2.5in behind the tray, one
+    // on the shroud and one in the cage, plus the cage's 3.5in and either-size mounts.
+    bays: { ssd25: 4, hdd35: 2 },
+    look: {
+      // slats, frontDepth and topSolidFront are estimates by proportion from the photos.
+      front: 'slats', slats: 11, holes: 'fine', frontDepth: 36, frontGap: 0, top: 'mesh', topSolidFront: 40,
+      // The USB ports and audio jack are on the glass side, low at the front, beside a
+      // second power button; the roof carries only a power button. The drawing puts them all on the roof.
+      ioAt: 'centre', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: false, powerRound: false, feet: 'pads',
+      shroud: 'vented', rearFan: 140, rearGrille: 'hex', rearVented: true, cableBar: false, pullTab: false,
+    },
+  },
+  {
+    id: 'fractal-meshify-3-tg', category: 'case', brand: 'Fractal Design', name: 'Meshify 3', sku: 'FD-C-MES3A-02',
+    source: 'https://www.fractal-design.com/products/cases/meshify-series/meshify-3/meshify-3-black-tg-light-tint/',
+    dims: { length: 433, width: 229, height: 507 },
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 349, maxCoolerHeight: 173,
+    psuFormFactors: ['ATX'], maxPsuLength: 180, expansionSlots: 7,
+    // Three Momentum 14 fans, all at the front; no rear fan ships.
+    includedFans: { front: [140, 140, 140], top: [], rear: [] },
+    radiators: { front: [120, 240, 280, 360], top: [120, 140, 240, 280], rear: [120] },
+    // Two dedicated 2.5-inch mounts and four that take either size.
+    bays: { ssd25: 2, hdd35: 4 },
+    look: {
+      // frontDepth and topSolidFront are estimates by proportion from the side and top photos.
+      front: 'mesh', slats: 0, holes: 'fine', frontDepth: 30, frontGap: 0, top: 'mesh', topSolidFront: 50,
+      ioAt: 'centre', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: false, powerRound: true, feet: 'pads',
+      shroud: 'full', rearFan: 120, rearGrille: 'slots', rearVented: true, cableBar: true, pullTab: true,
+    },
+  },
+  {
+    id: 'corsair-frame-4000d-rs-argb', category: 'case', brand: 'Corsair', name: 'FRAME 4000D RS ARGB', sku: 'CC-9011296-WW',
+    source: 'https://www.corsair.com/us/en/p/pc-cases/cc-9011296-ww/frame-4000d-rs-argb-modular-mid-tower-pc-case-cc-9011296-ww',
+    // The spec table gives length 490; Corsair's FRAME 4000D series guide gives 487.
+    dims: { length: 490, width: 239, height: 486 },
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 430, maxCoolerHeight: 170,
+    // Seven horizontal slots; the three vertical positions are left out.
+    psuFormFactors: ['ATX'], maxPsuLength: 220, expansionSlots: 7,
+    // Three RS120 ARGB fans; the product renders show them at the front and the rear mount empty.
+    includedFans: { front: [120, 120, 120], top: [], rear: [] },
+    // A side mount (240 to 360 mm) has no place in this schema.
+    radiators: { front: [240, 280, 360], top: [240, 280, 360], rear: [120, 140] },
+    // Not in the spec table; Corsair's FRAME 4000D series guide gives 4x 2.5in and 2x 3.5in.
+    bays: { ssd25: 4, hdd35: 2 },
+    look: {
+      // frontDepth and topSolidFront are estimates by proportion from the renders.
+      front: 'mesh', slats: 0, holes: 'triangles', frontDepth: 35, frontGap: 0, top: 'mesh', topSolidFront: 30,
+      // The ports sit on a strip at the foot of the front panel, not on the roof.
+      ioAt: 'centre', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: false, powerRound: true, feet: 'pads',
+      shroud: 'vented', rearFan: 140, rearGrille: 'hex', rearVented: false, cableBar: false, pullTab: false,
+    },
+  },
+  {
+    id: 'phanteks-xt-pro-ultra', category: 'case', brand: 'Phanteks', name: 'XT Pro Ultra', sku: 'PH-XT523P1_DBK01',
+    source: 'https://phanteks.com/product/xt-pro-ultra-black/',
+    dims: { length: 450, width: 230, height: 500 },
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 415, maxCoolerHeight: 184,
+    psuFormFactors: ['ATX'], maxPsuLength: 270, expansionSlots: 7,
+    // Four M25-140 D-RGB fans ship; the photos show three at the front and one at the rear.
+    includedFans: { front: [140, 140, 140], top: [], rear: [140] },
+    // The page prints maxima only (top 360, front 240, rear 120, all 120 mm
+    // family; no 140 mm radiators); the smaller sizes are assumed to fit.
+    radiators: { front: [120, 240], top: [120, 240, 360], rear: [120] },
+    // Two layouts are printed: 5x 2.5in + 1x 3.5in, or 3x 2.5in + 2x 3.5in. The second is used.
+    bays: { ssd25: 3, hdd35: 2 },
+    look: {
+      // Same chassis as the XT Pro; frontDepth and topSolidFront are estimates by proportion from the photos.
+      front: 'mesh', slats: 0, holes: 'fine', frontDepth: 28, frontGap: 0, top: 'mesh', topSolidFront: 35,
+      ioAt: 'far', ports: { usbA: 1, usbC: 1, audio: 1 }, reset: true, powerRound: true, feet: 'pads',
+      shroud: 'full', rearFan: 140, rearGrille: 'slots', rearVented: true, cableBar: false, pullTab: false,
+    },
+  },
+  {
+    // Antec prints no part number; this is the UPC its spec table gives for the FLUX PRO.
+    id: 'antec-flux-pro', category: 'case', brand: 'Antec', name: 'FLUX PRO', sku: '0761345101486',
+    source: 'https://www.antec.com/product/case/flux-pro',
+    dims: { length: 530, width: 245, height: 545 },
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 455, maxCoolerHeight: 190,
+    // The page prints 180 or 300 mm including cables with the drive cage fitted,
+    // 470 mm without it, and 180 mm side-mounted; the shortest is used.
+    psuFormFactors: ['ATX'], maxPsuLength: 180, expansionSlots: 8,
+    // Six fans ship: three 140 mm front, one 140 mm rear, and two 120 mm
+    // reverse-blade fans on the shroud, which this schema has no place for.
+    includedFans: { front: [140, 140, 140], top: [], rear: [140] },
+    // Shroud (120/240/360) and bottom (120/240) radiator mounts are not recorded.
+    radiators: { front: [120, 140, 240, 280, 360, 420], top: [120, 140, 240, 280, 360, 420], rear: [120, 140] },
+    // The table prints "3.5in / 2.5in: 4 / 4" and "2.5in: 2"; read as four
+    // either-size mounts and two dedicated 2.5in mounts.
+    bays: { ssd25: 2, hdd35: 4 },
+    look: {
+      // frontDepth and topSolidFront are estimates by proportion from the photos.
+      front: 'mesh', slats: 0, holes: 'fine', frontDepth: 30, frontGap: 0, top: 'mesh', topSolidFront: 20,
+      ioAt: 'far', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: true, powerRound: false, feet: 'pads',
+      shroud: 'vented', rearFan: 140, rearGrille: 'hex', rearVented: true, cableBar: false, pullTab: false,
+    },
+  },
 ];

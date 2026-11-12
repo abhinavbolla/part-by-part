@@ -39,4 +39,20 @@ export const STORAGE: StoragePart[] = [
     source: 'https://www.sandisk.com/products/ssd/internal-ssd/wd-blue-sa510-sata-2-5-ssd?sku=WDS100T5B0A-00LMP0',
     formFactor: '2.5"', length: 100, // the maker gives 3.94 in only
     interface: 'sata', capacityGb: 1000 },
+  { id: 'wd-black-sn8100-2tb', category: 'storage', brand: 'WD_BLACK', name: 'SN8100 2 TB', sku: 'WDS200T1X0M-00CMT0',
+    source: 'https://documents.sandisk.com/content/dam/asset-library/en_us/assets/public/sandisk/product/internal-drives/wd-black-ssd/data-sheet-wd-black-sn8100-nvme-ssd.pdf',
+    formFactor: 'M.2', length: 80, interface: 'nvme', capacityGb: 2000 },
+  { id: 'wd-black-sn7100-1tb', category: 'storage', brand: 'WD_BLACK', name: 'SN7100 1 TB', sku: 'WDS100T4X0E-00CJA0',
+    source: 'https://documents.sandisk.com/content/dam/asset-library/en_us/assets/public/sandisk/product/internal-drives/wd-black-ssd/data-sheet-wd-black-sn7100-nvme-ssd.pdf',
+    formFactor: 'M.2', length: 80, interface: 'nvme', capacityGb: 1000 },
+  { id: 'samsung-9100-pro-2tb', category: 'storage', brand: 'Samsung', name: '9100 Pro 2 TB', sku: 'MZ-VAP2T0BW',
+    source: 'https://www.samsung.com/uk/memory-storage/nvme-ssd/9100-pro-2tb-nvme-pcie-gen-5-mz-vap2t0bw/',
+    formFactor: 'M.2', length: 80, interface: 'nvme', capacityGb: 2000 },
+  { id: 'teamgroup-mp44-2tb', category: 'storage', brand: 'TeamGroup', name: 'MP44 2 TB', sku: 'TM8FPW002T0C101',
+    source: 'https://www.teamgroupinc.com/en/product-detail/ssd/TEAMGROUP/mp44/mp44-TM8FPW002T0C101/',
+    formFactor: 'M.2', length: 80, interface: 'nvme', capacityGb: 2000 },
+  // The part number is the one Lexar's North America page prints for 4 TB; its product sheet stops at 2 TB
+  { id: 'lexar-nm790-4tb', category: 'storage', brand: 'Lexar', name: 'NM790 4 TB', sku: 'LNM790X004T-RNNNU',
+    source: 'https://americas.lexar.com/product/lexar-nm790-m-2-2280-pcie-gen-4x4-nvme-ssd/',
+    formFactor: 'M.2', length: 80, interface: 'nvme', capacityGb: 4000 },
 ];

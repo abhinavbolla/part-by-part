@@ -323,4 +323,186 @@ export const GPUS: GpuPart[] = [
     power: 245, // AMD's figure; ASRock prints none for this card
     connectors: { pcie8: 2, hpwr16: 0 }, recommendedPsu: 750, fans: 2,
   },
+  {
+    id: 'msi-rtx-5060-ventus-2x-oc-8g', category: 'gpu', brand: 'MSI',
+    name: 'GeForce RTX 5060 Ventus 2X OC', sku: 'G5060-8V2C',
+    source: 'https://www.msi.com/Graphics-Card/GeForce-RTX-5060-8G-VENTUS-2X-OC/Specification',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      // Fan size, blade count, tip ring and board length estimated from MSI's photos
+      fanSizes: [88, 88], blades: 9, fanRing: 'full', pcb: 140,
+      finish: { shroud: 'silver', back: 'black' },
+      backplate: { open: 'bars', from: 0.68, to: 0.95, span: 0.67 },
+      shroud: { cut: 10, corners: 'all', pattern: 'rims', wrap: 0.4 },
+      // Read off an angled photo of the top edge; positions are approximate
+      edge: { fins: [[0.2, 0.6]], plate: [0.12, 0.6] },
+      power: { at: 137, recessed: true }, // position estimated from MSI's photos
+      lights: {}, tail: 'closed', bracket: 'rounds',
+    },
+    chip: 'GeForce RTX 5060', length: 197, height: 120, thickness: 41,
+    slots: 2.02, // derived from the 41 mm thickness
+    power: 145, // MSI's figure for this board
+    connectors: { pcie8: 1, hpwr16: 0 }, recommendedPsu: 550, fans: 2,
+  },
+  {
+    id: 'palit-rtx-5060-ti-dual-8gb', category: 'gpu', brand: 'Palit',
+    name: 'GeForce RTX 5060 Ti Dual 8GB', sku: 'NE7506T019P1-GB2062D',
+    source: 'https://www.palit.com/palit/vgapro.php?id=5545&lang=en',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      // Palit states two 95 mm fans. Blade count and board length estimated from its photos.
+      fanSizes: [95, 95], blades: 11, fanRing: 'none', pcb: 150,
+      finish: { shroud: 'black', back: 'black' },
+      backplate: { open: 'bars', from: 0.58, to: 0.97, span: 0.9 },
+      shroud: { cut: 8, corners: 'all', pattern: 'rims', wrap: 0.5 },
+      edge: { fins: [[0.09, 0.42]], plate: [0.56, 0.94] },
+      power: { at: 128, recessed: true }, // position estimated from Palit's photos
+      lights: { edge: [0.58, 0.92] }, tail: 'closed', bracket: 'rounds',
+    },
+    chip: 'GeForce RTX 5060 Ti', length: 262.1, height: 126.3, thickness: 40.1,
+    slots: 2,
+    power: 180, // Palit's figure for this board
+    connectors: { pcie8: 1, hpwr16: 0 }, recommendedPsu: 600, fans: 2,
+  },
+  {
+    id: 'msi-rtx-5060-ti-gaming-oc-16g', category: 'gpu', brand: 'MSI',
+    name: 'GeForce RTX 5060 Ti Gaming OC', sku: 'G506T-16GC',
+    source: 'https://www.msi.com/Graphics-Card/GeForce-RTX-5060-Ti-16G-GAMING-OC/Specification',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      fanSizes: [98, 98], blades: 7, fanRing: 'full', pcb: 150, // fan and board sizes estimated from MSI's photos
+      finish: { shroud: 'grey', back: 'black' },
+      backplate: { open: 'bars', from: 0.6, to: 0.945, span: 0.79 },
+      shroud: { cut: 12, corners: 'tail', pattern: 'wedges', wrap: 0.35 },
+      // Read off an angled photo of the top edge; positions are approximate
+      edge: { fins: [[0.03, 0.93]], plate: [0.5, 0.92] },
+      power: { at: 116, recessed: true }, // position estimated from MSI's photos
+      lights: { edge: [0.36, 0.46] }, tail: 'closed', bracket: 'truss',
+    },
+    chip: 'GeForce RTX 5060 Ti', length: 247, height: 135, thickness: 51,
+    slots: 2.51, // derived from the 51 mm thickness
+    power: 180, // MSI's figure for this board
+    connectors: { pcie8: 0, hpwr16: 1 }, recommendedPsu: 600, fans: 2,
+  },
+  {
+    id: 'msi-rtx-5070-ti-ventus-3x-oc-16g', category: 'gpu', brand: 'MSI',
+    name: 'GeForce RTX 5070 Ti Ventus 3X OC', sku: 'G507T-16V3C',
+    source: 'https://www.msi.com/Graphics-Card/GeForce-RTX-5070-Ti-16G-VENTUS-3X-OC/Specification',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      // Fan size, blade count, tip ring and board length estimated from MSI's photos
+      fanSizes: [90, 90, 90], blades: 9, fanRing: 'full', pcb: 165,
+      finish: { shroud: 'silver', back: 'black' },
+      backplate: { open: 'bars', from: 0.59, to: 0.96, span: 0.74 },
+      shroud: { cut: 8, corners: 'all', pattern: 'rims', wrap: 0.3 },
+      // Read off an angled photo of the top edge; positions are approximate
+      edge: { fins: [[0.1, 0.42], [0.52, 0.97]], plate: [0.62, 0.95] },
+      power: { at: 146, recessed: true }, // position estimated from MSI's photos
+      lights: {}, tail: 'closed', bracket: 'rounds',
+    },
+    chip: 'GeForce RTX 5070 Ti', length: 303, height: 121, thickness: 49,
+    slots: 2.41, // derived from the 49 mm thickness
+    power: 300, // MSI's figure for this board
+    connectors: { pcie8: 0, hpwr16: 1 }, recommendedPsu: 750, fans: 3,
+  },
+  {
+    id: 'gigabyte-rtx-5080-windforce-sff-16g', category: 'gpu', brand: 'Gigabyte',
+    name: 'GeForce RTX 5080 Windforce SFF', sku: 'GV-N5080WF3-16GD',
+    source: 'https://www.gigabyte.com/Graphics-Card/GV-N5080WF3-16GD/sp',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      // Fan sizes, blade count (the photos blur the blades) and board length estimated from Gigabyte's photos.
+      fanSizes: [95, 95, 95], blades: 7, fanRing: 'none', pcb: 205,
+      finish: { shroud: 'black', back: 'black' },
+      // Chip window position and size estimated from Gigabyte's photos
+      backplate: { open: 'window', from: 0.71, to: 0.93, span: 0.82, chip: { at: 0.31, size: 50, cross: true } },
+      shroud: { cut: 4, corners: 'tail', pattern: 'wedges', wrap: 0.48 },
+      edge: { fins: [[0.03, 0.97]], plate: [0.07, 0.39] },
+      power: { at: 181, recessed: true }, // position estimated from Gigabyte's photos
+      lights: {}, tail: 'closed', bracket: 'slots',
+    },
+    chip: 'GeForce RTX 5080', length: 304, height: 126, thickness: 50,
+    slots: 2.46, // derived from the 50 mm thickness
+    power: 360, // Nvidia's figure; Gigabyte prints none for this card
+    connectors: { pcie8: 0, hpwr16: 1 }, recommendedPsu: 850, fans: 3,
+  },
+  {
+    id: 'powercolor-hellhound-rx-9070-16gb', category: 'gpu', brand: 'PowerColor',
+    name: 'Hellhound Radeon RX 9070', sku: 'RX9070 16G-L/OC',
+    source: 'https://www.powercolor.com/product-detail214.htm',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      // Fan sizes and board length estimated from PowerColor's photos; the middle fan is the smaller one. Blade count as PowerColor's "up to 9 blades" and its photo agree.
+      fanSizes: [100, 90, 100], blades: 9, fanRing: 'full', pcb: 220,
+      finish: { shroud: 'black', back: 'black' },
+      backplate: { open: 'bars', from: 0.71, to: 0.94, span: 0.9, chip: { at: 0.28, size: 66, cross: true } },
+      // The real chamfer is on the tail corner at the window edge only; the schema draws both tail corners
+      shroud: { cut: 22, corners: 'tail', pattern: 'plain', wrap: 0.3 },
+      edge: { fins: [[0.05, 0.95]] },
+      power: { at: 206, recessed: true }, // position measured on PowerColor's backplate photo
+      lights: { tail: true }, tail: 'closed', bracket: 'slants',
+    },
+    chip: 'Radeon RX 9070', length: 327,
+    height: 128, // PowerColor's figure without the bracket; it gives 142 mm with it
+    thickness: 41,
+    slots: 2,
+    power: 220, // AMD's figure; PowerColor prints none for this card
+    connectors: { pcie8: 2, hpwr16: 0 }, recommendedPsu: 700, fans: 3,
+  },
+  {
+    id: 'sapphire-pulse-rx-9070-gre-12gb', category: 'gpu', brand: 'Sapphire',
+    name: 'Pulse Radeon RX 9070 GRE', sku: '11354-01-20G',
+    source: 'https://www.sapphiretech.com/en/consumer/pulse-radeon-rx-9070-gre-12g-gddr6',
+    outputs: { dp: 2, hdmi: 2 },
+    look: {
+      fanSizes: [95, 95], blades: 7, fanRing: 'full', pcb: 190, // fan sizes from Sapphire's dimension drawing; board length estimated from its photos
+      finish: { shroud: 'black', back: 'black' },
+      backplate: { open: 'bars', from: 0.72, to: 0.97, span: 0.73, chip: { at: 0.32, size: 64, cross: true } },
+      shroud: { cut: 0, corners: 'all', pattern: 'stripes', wrap: 0.5 },
+      edge: { fins: [[0.08, 0.55], [0.66, 0.95]] }, // read off an angled photo; positions are approximate
+      power: { at: 172, recessed: true }, // position measured on Sapphire's backplate photo
+      lights: {}, tail: 'cage', bracket: 'slants',
+    },
+    chip: 'Radeon RX 9070 GRE', length: 280, height: 120.25, thickness: 51.5,
+    slots: 2.5, power: 240, connectors: { pcie8: 2, hpwr16: 0 }, recommendedPsu: 650, fans: 2,
+  },
+  {
+    id: 'asrock-arc-b570-challenger-10gb-oc', category: 'gpu', brand: 'ASRock',
+    name: 'Intel Arc B570 Challenger 10GB OC', sku: 'B570 CL 10GO',
+    source: 'https://www.asrock.com/Graphics-Card/Intel/Intel%20Arc%20B570%20Challenger%2010GB%20OC/index.asp',
+    outputs: { dp: 3, hdmi: 1 },
+    look: {
+      // Fan sizes, blade count and board length estimated from ASRock's photos; the tail fan looks slightly larger.
+      fanSizes: [95, 100], blades: 13, fanRing: 'none', pcb: 170,
+      finish: { shroud: 'black', back: 'black' },
+      backplate: { open: 'window', from: 0.7, to: 0.91, span: 0.73 },
+      shroud: { cut: 10, corners: 'all', pattern: 'rims', wrap: 0.5 },
+      edge: { fins: [[0.1, 0.52], [0.65, 0.97]], plate: [0.085, 0.39] },
+      power: { at: 142, recessed: true }, // position measured on ASRock's top-edge photo
+      lights: { edge: [0.07, 0.42] }, tail: 'closed', bracket: 'rounds',
+    },
+    chip: 'Arc B570', length: 249, height: 132, thickness: 41,
+    slots: 2,
+    power: 150, // Intel's figure for the chip; ASRock prints none for this card
+    connectors: { pcie8: 1, hpwr16: 0 }, recommendedPsu: 600, fans: 2,
+  },
+  {
+    id: 'asus-prime-rx-9060-xt-8gb-oc', category: 'gpu', brand: 'ASUS',
+    name: 'Prime Radeon RX 9060 XT 8GB OC Edition', sku: 'PRIME-RX9060XT-O8G',
+    source: 'https://www.asus.com/motherboards-components/graphics-cards/prime/prime-rx9060xt-o8g/techspec/',
+    outputs: { dp: 2, hdmi: 1 },
+    look: {
+      fanSizes: [90, 90, 90], blades: 11, fanRing: 'full', pcb: 190, // fan and board sizes estimated from ASUS's photos
+      finish: { shroud: 'black', back: 'black' },
+      backplate: { open: 'window', from: 0.75, to: 0.915, span: 0.76 },
+      shroud: { cut: 10, corners: 'tail', pattern: 'lines', wrap: 0.38 },
+      edge: { fins: [[0.08, 0.45], [0.5, 0.93]], plate: [0.67, 0.93] },
+      power: { at: 165, recessed: true }, // position measured on ASUS's backplate and top-edge photos
+      lights: {}, tail: 'closed', bracket: 'slots',
+    },
+    chip: 'Radeon RX 9060 XT', length: 304, height: 126, thickness: 50,
+    slots: 2.5,
+    power: 150, // AMD's figure for the 8 GB card; ASUS prints none
+    connectors: { pcie8: 1, hpwr16: 0 }, recommendedPsu: 550, fans: 3,
+  },
 ];

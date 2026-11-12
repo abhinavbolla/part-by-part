@@ -54,4 +54,23 @@ export const RAM: RamPart[] = [
   { id: 'kingston-fury-beast-ddr4-32-3200', category: 'ram', brand: 'Kingston', name: 'Fury Beast DDR4 32 GB',
     sku: 'KF432C16BBK2/32', source: 'https://www.kingston.com/datasheets/KF432C16BBK2_32.pdf',
     ramType: 'DDR4', modules: 2, gbPerModule: 16, speed: 3200, height: 34, look: { top: 'flat' } },
+  { id: 'gskill-trident-z5-neo-rgb-32-6000', category: 'ram', brand: 'G.Skill', name: 'Trident Z5 Neo RGB DDR5 32 GB',
+    sku: 'F5-6000J3038F16GX2-TZ5NR',
+    source: 'https://www.gskill.com/specification/165/390/1661410135/F5-6000J3038F16GX2-TZ5NR-Specification',
+    ramType: 'DDR5', modules: 2, gbPerModule: 16, speed: 6000,
+    height: 44, // from G.Skill's memory FAQ ("How tall are the memory modules?"); the kit's own page prints no height
+    look: { top: 'lightbar' } },
+  { id: 'corsair-dominator-platinum-rgb-32-6000', category: 'ram', brand: 'Corsair', name: 'Dominator Platinum RGB DDR5 32 GB',
+    sku: 'CMT32GX5M2B6000C30',
+    source: 'https://www.corsair.com/us/en/p/memory/cmt32gx5m2b6000c30/dominator-platinum-rgb-2x16gb-ddr5-dram-6000mt-s-c30-intel-xmp-memory-kit-cmt32gx5m2b6000c30',
+    ramType: 'DDR5', modules: 2, gbPerModule: 16, speed: 6000,
+    height: 56, // from Corsair's DDR5 module dimensions table for the whole CMT line; the product page does not print it
+    look: { top: 'lightbar' } },
+  { id: 'kingston-fury-beast-rgb-ddr5-32-6000', category: 'ram', brand: 'Kingston', name: 'Fury Beast RGB DDR5 32 GB',
+    sku: 'KF560C30BBEAK2-32', source: 'https://www.kingston.com/datasheets/KF560C30BBEAK2-32.pdf',
+    ramType: 'DDR5', modules: 2, gbPerModule: 16, speed: 6000, height: 42.23, look: { top: 'lightbar' } },
+  { id: 'teamgroup-t-force-xtreem-argb-ddr4-16-3600', category: 'ram', brand: 'TeamGroup', name: 'T-Force Xtreem ARGB DDR4 16 GB',
+    sku: 'TF13D416G3600HC14CDC01',
+    source: 'https://www.teamgroupinc.com/en/product-detail/memory/T-FORCE/xtreem-argb-ddr4-white/xtreem-argb-ddr4-white-TF13D416G3600HC14CDC01/',
+    ramType: 'DDR4', modules: 2, gbPerModule: 8, speed: 3600, height: 48.7, look: { top: 'lightbar' } },
 ];
