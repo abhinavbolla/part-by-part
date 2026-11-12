@@ -489,4 +489,70 @@ export const MOTHERBOARDS: MotherboardPart[] = [
       battery: [27, 214],
     },
   },
+  {
+    id: 'asrock-b650m-pro-rs-wifi', category: 'motherboard', brand: 'ASRock',
+    name: 'B650M Pro RS WiFi', sku: 'B650M Pro RS WiFi',
+    source: 'https://www.asrock.com/mb/AMD/B650M%20Pro%20RS%20WiFi/index.asp#Specification',
+    rearIo: [['antenna'], ['antenna'], ['button'], ['dp', 'hdmi'], ['usbA', 'usbC'], ['usbA', 'usbA'], ['usbA', 'usbA'], ['lan', 'usbA', 'usbA'], ['audio', 'audio', 'audio']],
+    socket: 'AM5', chipset: 'B650', formFactor: 'mATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme'] },
+    ],
+    // One 8-pin CPU socket. PCIE2 is full length but runs at x4.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 1, fanHeaders: 5,
+    look: {
+      firstSlot: 1,
+      socket: [132, 77],
+      eps: [[50, 7]],
+      sinks: [
+        // Heights are estimates; a photo from above does not show them
+        { kind: 'io', at: [4, 15, 44, 132], tall: 38, tone: 'light', top: 'flat' },
+        { kind: 'vrm', at: [44, 15, 64, 133], tall: 32, tone: 'light', top: 'groovesDown' },
+        { kind: 'vrm', at: [81, 0, 154, 13], tall: 24, tone: 'light', top: 'flat' },
+        { kind: 'm2', at: [34, 137, 139, 161], tall: 9, tone: 'light', top: 'flat', covers: [0] },
+        { kind: 'chipset', at: [175, 166, 227, 203], tall: 10, tone: 'light', top: 'groovesAcross' },
+      ],
+      slots: [{ row: 3, size: 'x16', steel: false }],
+      m2: [[122, 149, -1], [122, 209, -1], [233, 223, -1]],
+      // SATA3_3/3_4 face off the edge; SATA3_1/3_2 stand upright beside the memory, which the drawing puts along the bottom
+      sataEdge: 2, sataAt: 194,
+      battery: [141, 183],
+    },
+  },
+  {
+    id: 'msi-mag-b760m-mortar-wifi', category: 'motherboard', brand: 'MSI',
+    name: 'MAG B760M Mortar WiFi', sku: 'MAG B760M MORTAR WIFI',
+    source: 'https://www.msi.com/Motherboard/MAG-B760M-MORTAR-WIFI/Specification',
+    rearIo: [['usbA', 'usbA', 'usbA', 'usbA'], ['dp', 'hdmi'], ['usbA', 'usbC'], ['lan', 'usbA', 'usbA'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical'], ['audio', 'audio', 'audio']],
+    // The spec page gives 256 GB as the most memory; the manual says 192 GB. The page is followed.
+    socket: 'LGA1700', chipset: 'B760', formFactor: 'mATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
+    m2Slots: [
+      { maxLength: 80, interfaces: ['nvme'] },
+      { maxLength: 80, interfaces: ['nvme', 'sata'] },
+    ],
+    // PCI_E3 is full length but runs at x4.
+    sataPorts: 4, pcieX16Slots: 2, epsConnectors: 2, fanHeaders: 6,
+    look: {
+      firstSlot: 1,
+      socket: [126, 79],
+      eps: [[47, 6], [66, 6]],
+      sinks: [
+        // Heights are estimates; a photo from above does not show them.
+        // The port cover and the left heatsink are one silver piece; split here so the CPU power sockets stay clear
+        { kind: 'io', at: [-8, 0, 40, 162], tall: 40, tone: 'light', top: 'flat', cuts: [['tr', 14], ['br', 27]] },
+        { kind: 'vrm', at: [40, 14, 74, 125], tall: 30, tone: 'light', top: 'flat', cuts: [['tl', 14]] },
+        { kind: 'vrm', at: [76, 0, 168, 27], tall: 28, tone: 'light', top: 'slashes' },
+        // The top heatsink steps down and left under the CPU power sockets
+        { kind: 'vrm', at: [57, 13, 76, 27], tall: 28, tone: 'light', top: 'flat' },
+        { kind: 'm2', at: [40, 135, 138, 157], tall: 9, tone: 'light', top: 'flat', covers: [0] },
+        { kind: 'chipset', at: [159, 167, 229, 226], tall: 10, tone: 'light', top: 'slashes', cuts: [['tl', 13], ['bl', 8]] },
+      ],
+      slots: [{ row: 2, size: 'x1', steel: false }, { row: 3, size: 'x16', steel: false }],
+      m2: [[126, 146, -1], [151, 207, -1]],
+      sataEdge: 2, sataAt: 219,
+      battery: [30, 187],
+    },
+  },
 ];

@@ -35,7 +35,7 @@ function fill(html: string, page: Page): string {
 function shell(): Plugin {
   let outDir = 'dist';
   return {
-    name: 'pc-builder-shell',
+    name: 'part-by-part-shell',
     configResolved(config) {
       outDir = config.build.outDir;
     },
@@ -104,7 +104,7 @@ function shell(): Plugin {
 /** Starts fetching the 3D code alongside the page instead of after its script runs. */
 function preloadScene(): Plugin {
   return {
-    name: 'pc-builder-preload-scene',
+    name: 'part-by-part-preload-scene',
     transformIndexHtml: {
       order: 'post',
       handler(_html, ctx) {

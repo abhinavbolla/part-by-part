@@ -6,7 +6,7 @@ import type { CablePart, CatalogItem, Category, Part, SlotCategory } from '../ca
 import { CATEGORY_LABEL, CATEGORY_ORDER, CATEGORY_PLURAL, SLOT_ORDER } from '../catalog/types.ts';
 import { estimatedLoad, evaluate, powerCheck, type Slots } from '../rules/compat.ts';
 
-export const SITE = 'PC Builder';
+export const SITE = 'Part by Part';
 
 const esc = (text: string): string =>
   text.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
@@ -14,29 +14,33 @@ const esc = (text: string): string =>
 const tb = (gb: number): string => (gb >= 1000 ? `${Math.round(gb / 100) / 10} TB` : `${gb} GB`);
 const m2Size = (length: number): string => (length === 80 ? '2280' : length === 110 ? '22110' : String(length));
 
-/** One line of the specs that matter most when choosing. */
+/** One line of the specs that matter most when choosing. A figure never parts from its unit when the line wraps. */
 export function specLine(item: CatalogItem): string {
+  return specText(item).replace(/(\d) (mm|W|GB|TB|cores|slots|×)/g, '$1\u00a0$2').replace(/× (\d)/g, '×\u00a0$1');
+}
+
+function specText(item: CatalogItem): string {
   switch (item.category) {
     case 'case':
-      return `${item.dims.length} × ${item.dims.width} × ${item.dims.height} mm · GPU ${item.maxGpuLength} mm`;
+      return `${item.dims.length} × ${item.dims.width} × ${item.dims.height} mm, cards to ${item.maxGpuLength} mm`;
     case 'motherboard':
-      return `${item.socket} · ${item.formFactor} · ${item.ramType}`;
+      return `${item.socket}, ${item.formFactor}, ${item.ramType}`;
     case 'cpu':
-      return `${item.socket} · ${item.cores} cores · ${item.tdp} W`;
+      return `${item.socket}, ${item.cores} cores, ${item.tdp} W`;
     case 'cooler':
       return item.kind === 'aio'
-        ? `Liquid · ${item.radiator.size} mm radiator`
-        : `Air · ${item.height} mm · ${item.fans} × ${item.fanSize}`;
+        ? `Liquid, ${item.radiator.size} mm radiator`
+        : `Air, ${item.height} mm tall, ${item.fans} × ${item.fanSize} mm`;
     case 'ram':
-      return `${item.ramType} · ${item.modules} × ${item.gbPerModule} GB · ${item.speed}`;
+      return `${item.ramType}-${item.speed}, ${item.modules} × ${item.gbPerModule} GB`;
     case 'storage':
       return item.formFactor === 'M.2'
-        ? `M.2 ${m2Size(item.length)} · ${item.interface === 'nvme' ? 'NVMe' : 'SATA'} · ${tb(item.capacityGb)}`
-        : `2.5" · SATA · ${tb(item.capacityGb)}`;
+        ? `M.2 ${m2Size(item.length)}, ${item.interface === 'nvme' ? 'NVMe' : 'SATA'}, ${tb(item.capacityGb)}`
+        : `2.5-inch, SATA, ${tb(item.capacityGb)}`;
     case 'gpu':
-      return `${item.length} mm · ${item.slots} slot · ${item.power} W`;
+      return `${item.length} mm, ${item.slots} slots, ${item.power} W`;
     case 'psu':
-      return `${item.wattage} W · ${item.formFactor} · ${item.length} mm`;
+      return `${item.wattage} W, ${item.formFactor}, ${item.length} mm long`;
   }
 }
 
@@ -57,7 +61,7 @@ export function specRows(item: CatalogItem): [string, string][] {
           ...item.includedFans.top.map((size) => `top ${size} mm`),
           ...item.includedFans.rear.map((size) => `rear ${size} mm`),
         ])],
-        ['Radiators', `front ${list(item.radiators.front)} · top ${list(item.radiators.top)} mm`],
+        ['Radiators', `front ${list(item.radiators.front)}; top ${list(item.radiators.top)} (mm)`],
         ['Drive mounts', `${item.bays.ssd25} × 2.5", ${item.bays.hdd35} × 3.5"`],
       ];
     case 'motherboard':
@@ -190,12 +194,16 @@ export const itemPath = (item: CatalogItem): string => `/parts/${item.category}/
 const facetAttrs = (item: CatalogItem): string =>
   facetsFor(item.category).map((facet) => ` data-f-${facet.key}="${esc(facet.of(item))}"`).join('');
 
-/** A catalog row: the part itself (drag or click), a link to its page, and a remove button. */
+/**
+ * A catalog row. The row itself opens the part's page (and can be dragged
+ * into the case); the one button at its right edge adds the part to the build
+ * or takes it out. The page script sets that button's words to match the build.
+ */
 function row(item: CatalogItem): string {
+  const verb = item.category === 'case' ? 'Use' : 'Add';
   return `<div class="card" data-id="${item.id}"${facetAttrs(item)}>
-<button class="pick" type="button"><span class="shot">${icon(item.category)}</span><span class="txt"><b>${esc(item.name)}</b><i>${esc(item.brand)}</i><span class="spec">${esc(specLine(item))}</span><span class="why"></span></span></button>
-<a class="more" data-nav href="${itemPath(item)}" aria-label="Details for ${esc(item.name)}">Details</a>
-<button class="rm" type="button" data-remove="${item.id}" hidden>Remove</button>
+<a class="open" data-nav draggable="false" href="${itemPath(item)}"><span class="shot">${icon(item.category)}</span><span class="txt"><b>${esc(item.name)}</b><i>${esc(item.brand)}</i><span class="spec">${esc(specLine(item))}</span><span class="why"></span></span></a>
+<button class="act" type="button" aria-label="${verb} ${esc(item.name)}">${verb}</button>
 </div>`;
 }
 
@@ -210,13 +218,13 @@ export interface Page {
 export function homePage(catalog: CatalogItem[]): Page {
   const links = CATEGORY_ORDER.map((category) => {
     const count = catalog.filter((item) => item.category === category).length;
-    return `<a class="catlink" data-nav data-cat="${category}" href="${categoryPath(category)}"><span class="shot">${icon(category)}</span><span class="txt"><b>${CATEGORY_PLURAL[category]}</b><span class="cur"></span></span><span class="n">${count}</span></a>`;
+    return `<a class="catlink" data-nav data-cat="${category}" data-n="${count}" href="${categoryPath(category)}"><span class="shot">${icon(category)}</span><span class="txt"><b>${CATEGORY_PLURAL[category]}</b><span class="cur">${count} to choose from</span></span></a>`;
   }).join('');
   return {
     path: '/',
     title: SITE,
     data: null,
-    panel: `<div class="page" data-title="${SITE}" data-kind="home"><h2>Parts</h2><nav class="cats">${links}</nav></div>`,
+    panel: `<div class="page" data-title="${SITE}" data-kind="home"><nav class="cats" aria-label="Kinds of part">${links}</nav></div>`,
   };
 }
 
@@ -252,7 +260,7 @@ export function itemPage(item: CatalogItem): Page {
   const specs = specRows(item)
     .map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`)
     .join('');
-  const action = item.category === 'case' ? 'Use this case' : 'Seat it';
+  const verb = item.category === 'case' ? 'Use this case' : 'Add to build';
   return {
     path: itemPath(item),
     title,
@@ -262,9 +270,9 @@ export function itemPage(item: CatalogItem): Page {
 <div class="card detail" data-id="${item.id}">
 <div class="figure"></div>
 <h2 class="name">${esc(item.name)}</h2>
-<p class="by">${esc(item.brand)} · ${esc(item.sku)}</p>
-<button class="pick act" type="button">${icon(item.category)}<span class="txt"><b>${action}</b><span class="why"></span></span></button>
-<button class="rm" type="button" data-remove="${item.id}" hidden>Remove</button>
+<p class="by">${esc(item.brand)}, ${esc(item.sku)}</p>
+<button class="act" type="button">${verb}</button>
+<p class="why"></p>
 </div>
 <dl class="specs">${specs}</dl>
 <p class="src"><a href="${esc(item.source)}" target="_blank" rel="noopener noreferrer">Specs from the manufacturer's page</a></p>
@@ -287,19 +295,39 @@ export function searchIndex(catalog: CatalogItem[]): { id: string; c: Category; 
 
 // ---- build panel ---------------------------------------------------------------
 
-const slotRow = (category: Category, part: CatalogItem | undefined, removable: boolean): string =>
-  `<li${part ? ' class="on"' : ''}><a class="k" data-nav href="${categoryPath(category)}">${CATEGORY_LABEL[category]}</a><span class="v">${
-    part ? `<a data-nav href="${itemPath(part)}">${esc(part.name)}</a>` : '—'
-  }</span>${
-    part && removable
-      ? `<button class="x" type="button" data-remove="${part.id}" aria-label="Remove ${esc(part.name)}">×</button>`
-      : ''
-  }</li>`;
+const CHOOSE: Record<Category, string> = {
+  case: 'Choose a case',
+  motherboard: 'Choose a motherboard',
+  cpu: 'Choose a processor',
+  cooler: 'Choose a cooler',
+  ram: 'Choose memory',
+  storage: 'Choose a drive',
+  gpu: 'Choose a graphics card',
+  psu: 'Choose a power supply',
+};
+
+const CROSS = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg>';
+
+/**
+ * One line of the build: its place in the order a machine is put together,
+ * what goes there, and the part that is there or a link to choose one.
+ */
+function slotRow(step: number | null, category: Category, part: CatalogItem | undefined, removable: boolean, next: boolean): string {
+  const state = part ? ' class="on"' : next ? ' class="next"' : '';
+  const what = part
+    ? `<a class="v" data-nav href="${itemPath(part)}">${esc(part.name)}</a>`
+    : `<a class="v" data-nav href="${categoryPath(category)}">${CHOOSE[category]}</a>`;
+  const remove = part && removable
+    ? `<button class="x" type="button" data-remove="${part.id}" aria-label="Remove ${esc(part.name)}">${CROSS}</button>`
+    : '';
+  return `<li${state}><span class="num">${step ?? ''}</span><span class="what"><a class="k" data-nav href="${categoryPath(category)}">${CATEGORY_LABEL[category]}</a>${what}</span>${remove}</li>`;
+}
 
 function wireRow(cable: CablePart, plugged: boolean): string {
+  const verb = plugged ? 'Unplug' : 'Plug in';
   return `<li class="card wire${plugged ? ' in' : ''}" data-id="${cable.id}">
-<button class="pick" type="button">${icon('cable')}<span class="txt"><b>${esc(cable.name)}</b><span class="spec">${esc(cable.detail)}</span><span class="why"></span></span></button>
-<button class="rm" type="button" data-remove="${cable.id}"${plugged ? '' : ' hidden'}>Unplug</button>
+<span class="open">${icon('cable')}<span class="txt"><b>${esc(cable.name)}</b><span class="spec">${esc(cable.detail)}</span><span class="why"></span></span></span>
+<button class="act" type="button"${plugged ? ` data-remove="${cable.id}"` : ''} aria-label="${verb}: ${esc(cable.name)}">${verb}</button>
 </li>`;
 }
 
@@ -308,21 +336,26 @@ export function statusHtml(
   wiring: { cable: CablePart; plugged: boolean }[],
   powered: boolean,
 ): string {
-  const single = (category: Exclude<SlotCategory, 'storage'>): string => slotRow(category, slots[category], true);
-  const rows = [
-    slotRow('case', slots.case, false),
-    ...SLOT_ORDER.map((category) =>
-      category === 'storage'
-        ? (slots.storage.length
-          ? slots.storage.map((drive) => slotRow('storage', drive, true)).join('')
-          : slotRow('storage', undefined, true))
-        : single(category)),
-  ].join('');
+  // The slots in the order a machine is put together; the first empty one is what to do next.
+  const order: Category[] = ['case', ...SLOT_ORDER];
+  const filled = (category: Category): boolean =>
+    category === 'case' ? true : category === 'storage' ? slots.storage.length > 0 : slots[category] !== undefined;
+  const nextUp = order.find((category) => !filled(category));
+  const rows = order.map((category, i) => {
+    if (category === 'case') return slotRow(i + 1, 'case', slots.case, false, false);
+    if (category === 'storage') {
+      return slots.storage.length
+        ? slots.storage.map((drive, k) => slotRow(k ? null : i + 1, 'storage', drive, true, false)).join('')
+        : slotRow(i + 1, 'storage', undefined, true, nextUp === 'storage');
+    }
+    return slotRow(i + 1, category, slots[category as Exclude<SlotCategory, 'storage'>], true, nextUp === category);
+  }).join('');
+  const done = order.filter(filled).length;
 
   const load = estimatedLoad(slots);
   const supply = slots.psu?.wattage ?? 0;
   const share = supply ? Math.min(100, Math.round((load / supply) * 100)) : 0;
-  const loadText = supply ? `${load} W of ${supply} W` : load ? `${load} W, no supply yet` : '—';
+  const loadText = supply ? `${load} W of ${supply} W` : load ? `${load} W, no supply yet` : 'nothing yet';
   const warnings = evaluate(slots).filter((issue) => issue.level === 'warn');
   const check = powerCheck(slots);
   const loose = wiring.filter((item) => !item.plugged).length;
@@ -332,9 +365,9 @@ export function statusHtml(
   if (check.unplugged.length) need.push(`Not plugged in: ${check.unplugged.join(', ')}.`);
   need.push(...check.faults);
 
-  return `<h2>Build</h2><ul class="slots">${rows}</ul>
+  return `<h2>Your build<span class="tally" data-done="${done}" data-of="${order.length}">${done} of ${order.length}</span></h2><ol class="slots">${rows}</ol>
 <div class="load"><span class="k">Estimated load</span><span class="v">${loadText}</span><div class="meter"><i style="width:${share}%"${share > 85 ? ' class="hot"' : ''}></i></div></div>
-${wiring.length ? `<h2>Wiring${loose > 1 ? `<button id="plugall" type="button">Plug in all ${loose}</button>` : ''}</h2><ul class="wires">${wiring.map((item) => wireRow(item.cable, item.plugged)).join('')}</ul>` : ''}
+${wiring.length ? `<h2>Cables${loose > 1 ? `<button id="plugall" type="button">Plug in all ${loose}</button>` : ''}</h2><ul class="wires">${wiring.map((item) => wireRow(item.cable, item.plugged)).join('')}</ul>` : ''}
 ${warnings.length ? `<ul class="warn">${warnings.map((issue) => `<li>${esc(issue.message)}</li>`).join('')}</ul>` : ''}
 <button id="power" type="button" class="power${powered ? ' on' : ''}"${check.ready ? '' : ' disabled'}>${powered ? 'Power off' : 'Power on'}</button>
 ${check.ready ? '' : `<p class="need">${esc(need.join(' '))}</p>`}`;

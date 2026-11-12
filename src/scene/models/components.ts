@@ -200,6 +200,8 @@ export function buildAirCooler(part: AirCoolerPart, bl: BoardLayout): PartModel 
   const stacks = Array.from({ length: towers }, (_, i) => look.stack[i] ?? derived);
   const spread = (i: number): number => i - (pipes - 1) / 2;
   const dy = look.offset ?? 0;
+  const dx = -(look.back ?? 0); // set back from the base along the airflow
+  const depthOf = (i: number): number => look.fanDepths?.[i] ?? fanDepth;
   const gap = 30; // between twin towers; the middle fan hangs in it
 
   // The contact plate, the block the pipes are soldered into, and the bar that clamps it down
@@ -210,14 +212,14 @@ export function buildAirCooler(part: AirCoolerPart, bl: BoardLayout): PartModel 
   box(group, 14, 104, 3, M.steel, 0, 0, 16.5);
 
   // Along x from the front: [fan] tower [fan] tower. A single tower has its fan in front.
-  const centres = towers === 2 ? [gap / 2 + stacks[0] / 2, -(gap / 2 + stacks[1] / 2)] : [0];
+  const centres = towers === 2 ? [dx + gap / 2 + stacks[0] / 2, dx - (gap / 2 + stacks[1] / 2)] : [dx];
   const bend = (points: [number, number, number][]): void => { tube(group, points, 3, M.steel, true, 6); };
   if (towers === 2) {
     // Each pipe lies across the base and rises once into each tower, the legs in a row
     const reach = part.width / 2 - 14;
     const legY = (i: number): number => dy + (pipes === 1 ? 0 : (spread(i) * 2 * reach) / (pipes - 1));
     centres.forEach((cx, tower) => {
-      const side = Math.sign(cx);
+      const side = tower === 0 ? 1 : -1;
       const legs = Array.from({ length: pipes }, (_, i): [number, number] => [cx, legY(i)]);
       finStack(group, stacks[tower], part.width, part.height, cx, dy, side, look, legs);
       legs.forEach(([lx, ly], i) => {
@@ -230,7 +232,7 @@ export function buildAirCooler(part: AirCoolerPart, bl: BoardLayout): PartModel 
     const run = stacks[0] - 16;
     const legs: [number, number][] = [];
     for (let i = 0; i < pipes; i++) {
-      const lx = pipes === 1 ? 0 : (spread(i) * run) / (pipes - 1);
+      const lx = dx + (pipes === 1 ? 0 : (spread(i) * run) / (pipes - 1));
       const reach = part.width * 0.25 + (i % 2) * 12;
       for (const side of [-1, 1]) {
         legs.push([lx, dy + side * reach]);
@@ -238,7 +240,7 @@ export function buildAirCooler(part: AirCoolerPart, bl: BoardLayout): PartModel 
         bend([[bx, side * 8, 9.5], [bx, side * 22, 10], [(bx + lx) / 2, side * (22 + reach) / 2 + side * 5, 19], [lx, dy + side * reach, 31]]);
       }
     }
-    finStack(group, stacks[0], part.width, part.height, 0, dy, 1, look, legs);
+    finStack(group, stacks[0], part.width, part.height, dx, dy, 1, look, legs);
   }
 
   // One lid over both towers and the fan between them. It goes on last.
@@ -261,31 +263,33 @@ export function buildAirCooler(part: AirCoolerPart, bl: BoardLayout): PartModel 
   }
 
   const sizes = look.fanSizes ?? Array<number>(part.fans).fill(part.fanSize);
-  const fanSpots: { x: number; from: [number, number, number] }[] = [];
+  // Fans in airflow order: the one in front first
+  const fanSpots: { x: number; from: [number, number, number]; between: boolean }[] = [];
   if (towers === 2) {
-    fanSpots.push({ x: 0, from: [0, 0, 150] });
-    if (part.fans > 1) fanSpots.unshift({ x: gap / 2 + stacks[0] + fanDepth / 2 + 0.5, from: [64, 0, 0] });
+    if (part.fans > 1) fanSpots.push({ x: dx + gap / 2 + stacks[0] + depthOf(0) / 2 + 0.5, from: [64, 0, 0], between: false });
+    fanSpots.push({ x: dx, from: [0, 0, 150], between: true });
   } else {
-    fanSpots.push({ x: stacks[0] / 2 + fanDepth / 2 + 0.5, from: [64, 0, 0] });
-    if (part.fans > 1) fanSpots.push({ x: -(stacks[0] / 2 + fanDepth / 2 + 0.5), from: [-64, 0, 0] });
+    fanSpots.push({ x: dx + stacks[0] / 2 + depthOf(0) / 2 + 0.5, from: [64, 0, 0], between: false });
+    if (part.fans > 1) fanSpots.push({ x: dx - (stacks[0] / 2 + depthOf(1) / 2 + 0.5), from: [-64, 0, 0], between: false });
   }
   const covered = look.top !== 'bare' && look.top !== 'caps';
   const fans = fanSpots.map((spot, i) => {
     const size = sizes[Math.min(i, sizes.length - 1)];
-    const between = towers === 2 && spot.x === 0;
-    const blower = fan(group, size, fanDepth, look.fanBlades?.[i] ?? look.blades, look.fanFrame === 'round');
+    const { between } = spot;
+    const deep = depthOf(i);
+    const blower = fan(group, size, deep, look.fanBlades?.[i] ?? look.blades, look.fanFrame === 'round');
     blower.group.rotation.y = Math.PI / 2;
     if (look.clips && !(between && look.top === 'hood')) {
       // Wire clips: two arms across the frame's side to a wire that springs into the fins.
       // In the fan's own frame x is up the cooler, y across it and z along the airflow.
-      const toFins = spot.x < -1 ? 1 : -1;
+      const toFins = spot.from[0] < 0 ? 1 : -1;
       copies(blower.group, 6, M.steel, (dummy, k) => {
         const y = (k < 3 ? -1 : 1) * (Math.min(size, part.width) / 2 + 0.8);
         if (k % 3 < 2) {
           dummy.position.set((k % 3 ? 1 : -1) * size * 0.3, y, toFins * 3.5);
-          dummy.scale.set(1.2, 1.2, fanDepth + 7);
+          dummy.scale.set(1.2, 1.2, deep + 7);
         } else {
-          dummy.position.set(0, y, toFins * (fanDepth / 2 + 6.5));
+          dummy.position.set(0, y, toFins * (deep / 2 + 6.5));
           dummy.scale.set(size * 0.6, 1.2, 1.2);
         }
       });

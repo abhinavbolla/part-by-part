@@ -73,6 +73,42 @@ export const COOLERS: CoolerPart[] = [
     kind: 'air', height: 158, width: 125, depth: 71,
     sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851', 'LGA1200'], fanSize: 120, fans: 1, towers: 1,
     look: { pipes: 4, stack: [45], top: 'bare', fins: 'sawtooth', cutaway: [0, 0], fanFrame: 'square', blades: 7, clips: true } },
+  { id: 'arctic-freezer-36-black', category: 'cooler', brand: 'Arctic', name: 'Freezer 36 Black', sku: 'ACFRE00123A',
+    source: 'https://www.arctic.de/en/Freezer-36-Black/ACFRE00123A',
+    kind: 'air', height: 159, width: 126, depth: 104,
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851'], fanSize: 120, fans: 2, towers: 1,
+    // Push-pull: a fan on each side of the one tower. The 54 mm stack is measured on Arctic's dimension drawing
+    // (54 + 2 x 25 mm fans = the published 104 mm). A screwed plate hides the pipe ends; the fans click into plastic
+    // frames rather than wire clips.
+    look: { pipes: 4, stack: [54], top: 'plate', fins: 'plain', cutaway: [0, 0], fanFrame: 'square', blades: 5, clips: false } },
+  { id: 'noctua-nh-u12a', category: 'cooler', brand: 'Noctua', name: 'NH-U12A', sku: 'NH-U12A',
+    source: 'https://www.noctua.at/en/products/nh-u12a/specifications',
+    // Noctua gives 58 mm without fans and 112 mm with both; 58 + 2 x 25 = 108, the rest is the fans' rubber
+    // corner pads and clips (not broken down by Noctua).
+    kind: 'air', height: 158, width: 125, depth: 112,
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851', 'LGA1200'], fanSize: 120, fans: 2, towers: 1,
+    look: { pipes: 7, stack: [58], top: 'bare', fins: 'sawtooth', cutaway: [0, 0], fanFrame: 'square', blades: 9, clips: true } },
+  { id: 'scythe-fuma-3', category: 'cooler', brand: 'Scythe', name: 'Fuma 3', sku: 'SCFM-3000',
+    source: 'https://www.scythe.co.jp/category/product/cpu-cooler/air-cooling/high-end/scfm-3000/',
+    // Scythe's 138 x 154 x 128 mm includes the fans and the fan clips; the fins alone are about 128 mm across
+    // (estimated from Scythe's front photo), drawn at the published 138.
+    kind: 'air', height: 154, width: 138, depth: 128,
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851', 'LGA1200'], fanSize: 120, fans: 2, towers: 2,
+    // A 15 mm slim front fan and a 26 mm middle fan (both published, rubber pads included). Scythe says the
+    // heatsink is set back but prints no figure for that or for the stacks:
+    // the slim front stack (32), deep rear stack (55), the towers' set-back (15) and the cut under
+    // the rear tower's back edge (about 10 tall, 30 deep) are measured on Scythe's side photo against the 128 mm
+    // depth. 32 + 30 + 55 + 15 = 132; the real middle fan fills a 26 mm gap, not the drawing's 30.
+    look: { pipes: 6, stack: [32, 55], top: 'plate', fins: 'plain', cutaway: [10, 30], back: 15, fanDepths: [15, 26],
+      fanFrame: 'square', blades: 9, clips: true } },
+  { id: 'deepcool-ak500', category: 'cooler', brand: 'DeepCool', name: 'AK500', sku: 'R-AK500-BKNNMT-G',
+    source: 'https://www.deepcool.com/products/Cooling/cpuaircoolers/AK500-High-Performance-CPU-Cooler/2022/16040.shtml',
+    // 90 mm heatsink + 25 mm fan = 115 against the published 117, which takes in the fan clips.
+    kind: 'air', height: 158, width: 127, depth: 117,
+    // The product page's socket list has no LGA1851; the manual linked from it does. The page is followed.
+    sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1200'], fanSize: 120, fans: 1, towers: 1,
+    // DeepCool's dimension drawing puts the 90 mm stack's middle about 24 mm behind the 40 mm base's middle.
+    look: { pipes: 5, stack: [90], top: 'grid', fins: 'sawtooth', cutaway: [0, 0], back: 24, fanFrame: 'square', blades: 9, clips: true } },
   { id: 'corsair-nautilus-240-rs', category: 'cooler', brand: 'Corsair', name: 'Nautilus 240 RS', sku: 'CW-9060088-WW',
     source: 'https://www.corsair.com/us/en/p/cpu-coolers/cw-9060088-ww/nautilus-240-rs-liquid-cpu-cooler-cw-9060088-ww',
     // Radiator size is from Corsair's Nautilus RS article; the product page omits it.

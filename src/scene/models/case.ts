@@ -92,6 +92,16 @@ function perforate(
 const rect = (a0: number, a1: number, b0: number, b1: number): [number, number][] =>
   [[a0, b0], [a1, b0], [a1, b1], [a0, b1]];
 
+/**
+ * Where the stack of front fans starts. Usually just above the shroud; a case
+ * with more fans than fit there carries them down in front of it, as the real
+ * ones do.
+ */
+function frontFansFrom(pcCase: CasePart, lay: CaseLayout): number {
+  const tall = pcCase.includedFans.front.reduce((sum, size) => sum + Math.min(size, lay.W - 30) + 4, 0);
+  return Math.max(lay.floorY + PANEL + 6, Math.min(lay.shroudTopY + 12, lay.H - PANEL - 10 - tall));
+}
+
 export function buildCase(pcCase: CasePart, lay: CaseLayout): CaseModel {
   const group = new Group();
   const look = pcCase.look ?? PLAIN;
@@ -167,7 +177,7 @@ export function buildCase(pcCase: CasePart, lay: CaseLayout): CaseModel {
     perforate(group, look.holes, 'x', [frontX + 0.7, midY, 0], frontWide - 8, frontTall - 8);
     if (look.holes === 'fine') {
       // A mesh this fine shows the intake fans behind it
-      let y = shroudTopY + 12;
+      let y = frontFansFrom(pcCase, lay);
       for (const size of pcCase.includedFans.front) {
         const fitted = Math.min(size, W - 30);
         for (const radius of [fitted / 2 - 2, fitted * 0.19]) {
@@ -350,7 +360,7 @@ export function buildCase(pcCase: CasePart, lay: CaseLayout): CaseModel {
 
   // ---- fans that ship with the case -----------------------------------------
   const rotors: Object3D[] = [];
-  let fanY = shroudTopY + 12;
+  let fanY = frontFansFrom(pcCase, lay);
   for (const size of pcCase.includedFans.front) {
     const fitted = Math.min(size, W - 30);
     const intake = fan(group, fitted, 25, fitted >= 140 ? 9 : 7);

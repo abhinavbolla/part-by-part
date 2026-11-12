@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PC Builder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part by Part</title>
 <meta name="description" content="Build a PC part by part: seat real components in a case and watch it come together.">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='1' width='10' height='14' rx='1.5' fill='none' stroke='%230a0a0a'/%3E%3Ccircle cx='8' cy='5' r='1.6' fill='none' stroke='%230a0a0a'/%3E%3C/svg%3E">
@@ -14,12 +14,17 @@
 <!--sprite-->
 <canvas id="view" aria-label="3D view of the build"></canvas>
 <aside id="tray" class="panel">
-<header><a class="home" data-nav href="/"><h1>PC Builder</h1></a><input id="search" type="search" placeholder="Search parts" autocomplete="off" spellcheck="false" aria-label="Search parts"></header>
+<header><a class="home" data-nav href="/"><h1>Part by Part</h1></a><input id="search" type="search" placeholder="Search parts" autocomplete="off" spellcheck="false" aria-label="Search parts"></header>
 <div id="panel" class="scroll"><!--panel--></div>
-<footer>Drag a part to its slot, or click to seat it.</footer>
+<footer>Drag a part into the case, or press Add.</footer>
 </aside>
 <aside id="status" class="panel" aria-live="polite"><!--status--></aside>
-<div id="timeline" class="panel">
+<nav id="tabs" aria-label="Panels">
+<button type="button" data-tab="parts" aria-pressed="true">Parts</button>
+<button type="button" data-tab="build" aria-pressed="false">Build <span id="tally"></span></button>
+<button type="button" id="sheet" aria-label="Make the panel taller" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"/></svg></button>
+</nav>
+<div id="timeline">
 <button id="undo" type="button" disabled>Undo</button>
 <button id="redo" type="button" disabled>Redo</button>
 <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" disabled aria-label="Build timeline">

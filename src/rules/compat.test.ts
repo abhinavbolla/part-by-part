@@ -61,7 +61,7 @@ test('catalog: ids and part numbers are unique, every item has a source, and the
   assert.equal(new Set(CATALOG.map((item) => `${item.category} ${item.sku}`)).size, CATALOG.length);
   for (const item of CATALOG) assert.match(item.source, /^https:\/\//, item.id);
   assert.ok(CATALOG.length >= 110, `only ${CATALOG.length} items`);
-  assert.equal(CASES.length, 10);
+  assert.equal(CASES.length, 11);
 });
 
 test('every board fits at least one case, and every ATX board fits every case', () => {

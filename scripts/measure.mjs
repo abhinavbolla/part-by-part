@@ -255,7 +255,7 @@ async function interact(browser, profile) {
     swaps.push(await follow(page, `.catlink[data-cat="${category}"]`, `.card[data-id="${id}"]`));
     await page.waitForFunction((part) => window.__pcb.resolve(part) != null, id);
     await page.waitForTimeout(350); // let the category's parts warm up, as they would while a person reads
-    await press(page, `.card[data-id="${id}"] .pick`);
+    await press(page, `.card[data-id="${id}"] .act`);
     clicks.push(await inputLatency(page));
     if (SHOTS) {
       await page.waitForTimeout(700);
@@ -270,7 +270,7 @@ async function interact(browser, profile) {
 
   // A part page clicked with no pause on its link: the fetch starts with the click.
   await follow(page, '.catlink[data-cat="gpu"]', '.card[data-id="asus-dual-rtx-4070"]');
-  const coldSwap = await follow(page, '.card[data-id="sapphire-pulse-rx-7800-xt-16gb"] .more', '.detail[data-id="sapphire-pulse-rx-7800-xt-16gb"]', 0);
+  const coldSwap = await follow(page, '.card[data-id="sapphire-pulse-rx-7800-xt-16gb"] .open', '.detail[data-id="sapphire-pulse-rx-7800-xt-16gb"]', 0);
   await follow(page, '.crumbs a[href="/parts/gpu/"]', '.card[data-id="asus-dual-rtx-4070"]');
 
   // Filters: "only what fits" hides the card that is too long for this case.
@@ -285,7 +285,7 @@ async function interact(browser, profile) {
   await press(page, '#fits');
 
   // A part that does not fit is refused, with the reason shown.
-  await press(page, '.card[data-id="asus-rog-strix-rtx-4090"] .pick');
+  await press(page, '.card[data-id="asus-rog-strix-rtx-4090"] .act');
   await page.waitForTimeout(250);
   expect(!(await installed(page, 'asus-rog-strix-rtx-4090')), 'the too-long card is refused');
   expect(await page.isVisible('#notice'), 'refusal shows a notice');
@@ -294,7 +294,7 @@ async function interact(browser, profile) {
 
   // Drag the graphics card from the list to its slot.
   const card = await page.evaluate((id) => {
-    const element = document.querySelector(`.card[data-id="${id}"] .pick`);
+    const element = document.querySelector(`.card[data-id="${id}"] .open`);
     element.scrollIntoView({ block: 'nearest' });
     const rect = element.getBoundingClientRect();
     return { x: rect.x, y: rect.y };
@@ -308,6 +308,7 @@ async function interact(browser, profile) {
   await page.mouse.up();
   const dropLatency = await inputLatency(page);
   expect(await installed(page, GPU), 'drag and drop installs the graphics card');
+  expect(await page.evaluate(() => location.pathname) === '/parts/gpu/', 'a drag does not also open the part page');
   await settled(page);
 
   // Wiring: plug everything in.
@@ -393,7 +394,7 @@ async function interact(browser, profile) {
   const second = await open(browser, profile);
   await second.page.goto(`${ORIGIN}/parts/case/`, { waitUntil: 'load' });
   await warmed(second.page);
-  await press(second.page, '.card[data-id="lian-li-lancool-216"] .pick');
+  await press(second.page, '.card[data-id="lian-li-lancool-216"] .act');
   expect(await second.page.evaluate(() => window.__pcb.store.pcCase.id) === 'lian-li-lancool-216', 'the case can be changed');
   for (const [category, id] of [
     ['motherboard', 'asus-rog-strix-b650e-i-gaming-wifi'],
@@ -403,7 +404,7 @@ async function interact(browser, profile) {
     await follow(second.page, '.crumbs a[href="/"]', '.catlink');
     await follow(second.page, `.catlink[data-cat="${category}"]`, `.card[data-id="${id}"]`);
     await second.page.waitForFunction((part) => window.__pcb.resolve(part) != null, id);
-    await press(second.page, `.card[data-id="${id}"] .pick`);
+    await press(second.page, `.card[data-id="${id}"] .act`);
     await settled(second.page);
     expect(await installed(second.page, id), `second build installs ${id}`);
   }

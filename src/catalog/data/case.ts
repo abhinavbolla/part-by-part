@@ -203,4 +203,27 @@ export const CASES: CasePart[] = [
       shroud: 'full', rearFan: 140, rearGrille: 'hex', rearVented: true, cableBar: false, pullTab: false,
     },
   },
+  {
+    id: 'phanteks-eclipse-g400a', category: 'case', brand: 'Phanteks', name: 'Eclipse G400A', sku: 'PH-EC400GA_DBK01',
+    source: 'https://phanteks.com/product/eclipse-g400a-black/',
+    dims: { length: 495, width: 230, height: 522 },
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 415, maxCoolerHeight: 184,
+    psuFormFactors: ['ATX'], maxPsuLength: 270, expansionSlots: 7,
+    // Four M25G2-140 fans ship fitted: three front, one rear. The lowest front
+    // fan sits down in front of the shroud, as the photos show.
+    includedFans: { front: [140, 140, 140], top: [], rear: [140] },
+    // The page prints maxima only (top 360 or 280, rear 120, no front or bottom
+    // radiator); the smaller sizes are assumed to fit.
+    radiators: { front: [], top: [120, 140, 240, 280, 360], rear: [120] },
+    // A 2.5-inch bay (2x 2.5 or 1x 3.5) and a 3.5-inch bay (2x 3.5).
+    bays: { ssd25: 2, hdd35: 2 },
+    look: {
+      // frontDepth and topSolidFront are estimates by proportion from the side and roof photos.
+      front: 'mesh', slats: 0, holes: 'fine', frontDepth: 30, frontGap: 0, top: 'mesh', topSolidFront: 30,
+      // The spec table prints "1x USB 3.0"; the roof photo shows two USB-A ports.
+      ioAt: 'far', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: true, powerRound: true, feet: 'pads',
+      shroud: 'vented', rearFan: 140, rearGrille: 'slots', rearVented: true, cableBar: false, pullTab: true,
+    },
+  },
 ];
