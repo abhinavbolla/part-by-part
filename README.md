@@ -1,22 +1,33 @@
-# pc-builder
+# Part by Part
 
 A website for building a PC part by part, as if assembling it for real: browse
-real components, seat them in the case, plug in the cables, and watch the build
+real components, add them to the case, plug in the cables, and watch the build
 come together.
-
-`pc-builder` is a working name.
 
 ## What works
 
-- **A catalog of 118 real parts** in the left panel: 10 cases, 16 motherboards,
-  19 processors, 18 coolers, 13 memory kits, 12 drives, 18 graphics cards and
-  12 power supplies. Each category is a list with filters, each part has its own
+- **A catalog of 125 real parts**: 11 cases, 18 motherboards, 19 processors,
+  22 coolers, 13 memory kits, 12 drives, 18 graphics cards and 12 power
+  supplies. Each category is a list with filters, each part has its own
   page with full specs and a link to the manufacturer, and there is a search box.
 - **"Only what fits my build"** filters a list with the same compatibility rules
   the case uses.
-- **Seating parts:** drag a part from a list to its slot, or click it. Valid
-  slots show a green outline; a part that does not fit shows red with the
-  reason, shakes and backs out.
+- **Adding parts:** every row has one button, always in the same place: Add,
+  or Remove once the part is in. The row itself opens the part's page. With a
+  mouse a part can also be dragged from a list into the case: valid slots show
+  a green outline; a part that does not fit shows red with the reason, shakes
+  and backs out.
+- **The build as a numbered list**, in the order a machine is put together,
+  with the next step marked and a link to choose it; cables each have a Plug in
+  button, and the power button says what is still missing.
+- **Any screen, mouse or touch:** on a wide window the parts are at the left,
+  the machine in the middle and the build at the right. On a landscape phone
+  or a small window the machine keeps the left and one panel at the right
+  switches between Parts and Build. On a portrait tablet both panels sit side
+  by side under the machine; on a portrait phone one panel sits under it with
+  the same two tabs and can be made taller. Nothing is hidden on a small
+  screen. One finger turns the case, two pinch to zoom, and buttons are 44 px
+  under a finger.
 - **A seating animation per part:** the socket frame opens for the CPU, memory
   clips snap shut, the heatsink over an M.2 socket swings up, the drive goes in
   at an angle and is pressed flat and the heatsink comes back down, cooler fans
@@ -127,6 +138,13 @@ Add `?hud` to the address, or press `H`, for a live speed readout.
 - **Nothing shifts.** The box for a part's drawing is sized in the HTML before
   the drawing exists, so lists do not move when drawings arrive.
 
+The interface was designed following the `frontend-design` guidance in
+[anthropics/skills](https://github.com/anthropics/skills) (Apache-2.0): a
+drawing sheet with the panels docked as its margins, lettered in the DIN family
+that engineering drawings use, taken from fonts the device already has (DIN
+Alternate, Bahnschrift) so that no font is downloaded. None of that project's
+text or code is included here.
+
 Dependencies: `three` at runtime; Vite, TypeScript and `playwright-core` (for
 `npm run measure`, using the installed Chrome) for development.
 
@@ -173,8 +191,14 @@ frame still walked them, and twice the parts meant about 160 late frames in
 850 where the smaller catalog had 40 in 990 (same machine, same busy hour).
 Hidden parts now wait outside the scene and nothing is prepared while
 something is moving; the same run then gave 1 late frame in 1028 throttled and
-none unthrottled. First load is unchanged at 155 KB, since part data is loaded
-per category. The whole table has not been re-run on a quiet machine since.
+none unthrottled. First load was unchanged at 155 KB, since part data is loaded
+per category.
+
+The redesigned interface (one button per row, the numbered build list, the
+layouts for small screens) added 2 KB: first load is 157 KB in 4 requests. A
+run at a calmer moment gave first paint 48 ms and a first 3D frame at 129 ms,
+no late frames in 1020 unthrottled and 10 in 1015 with the CPU slowed four
+times. The whole table has not been re-run on a quiet machine since.
 
 The throttled column slows the CPU and network only; the GPU is still this
 machine's. Nothing has been measured on a phone or a low-end laptop, and only
@@ -217,12 +241,14 @@ catalog does not record (chokes, headers, the memory and 24-pin sockets) are in
 a usual arrangement for the board's size, not that board's own.
 
 Some real parts are left out because the drawing cannot do them justice yet:
-cases whose power supply is not under a shroud at the bottom rear, or whose
-front fans do not sit low; microATX boards whose graphics slot is in the top
-position; coolers that blow down at the board, sit back from the socket or
-carry a fan on both sides of one tower; cards with fans on both faces. A screen
-or mirror on a pump block is drawn as a plain disc, and a power supply's fan
-grille is the same rings and spokes on every unit.
+cases whose power supply is not under a shroud at the bottom rear (the NZXT
+H7 Flow of 2024 stands it upright behind the tray), coolers that blow down at
+the board, and cards with fans on both faces. Three were left out because
+their makers no longer show what the catalog records: a drive whose product
+page is gone and whose length the maker prints nowhere, a power supply whose
+rear face is in no photo, and a card whose maker's site sits behind a bot
+check. A screen or mirror on a pump block is drawn as a plain disc, and a
+power supply's fan grille is the same rings and spokes on every unit.
 Where a maker does not print a value it is marked in the data file: for example
 AMD peak power is derived from TDP, one memory kit's height comes from reseller
 sheets, and one liquid cooler's pump height is not published. Brand and model

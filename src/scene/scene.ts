@@ -92,7 +92,8 @@ interface Loose {
 }
 
 const BG = 0xffffff;
-const LOOK_KEY = 'pc-builder:look';
+const LOOK_KEY = 'part-by-part:look';
+const OLD_LOOK_KEY = 'pc-builder:look'; // the choice saved under the project's working name
 const SNAP_PX = 120;
 const SHAKE = 0.42;
 
@@ -402,7 +403,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
 
   let look: Look = 'drawing';
   try {
-    if (localStorage.getItem(LOOK_KEY) === 'shaded') look = 'shaded';
+    if ((localStorage.getItem(LOOK_KEY) ?? localStorage.getItem(OLD_LOOK_KEY)) === 'shaded') look = 'shaded';
   } catch {
     // Storage may be unavailable; the drawing look is the default.
   }
