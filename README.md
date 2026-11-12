@@ -6,17 +6,19 @@ come together.
 
 ## What works
 
-- **A catalog of 125 real parts**: 11 cases, 18 motherboards, 19 processors,
-  22 coolers, 13 memory kits, 12 drives, 18 graphics cards and 12 power
-  supplies. Each category is a list with filters, each part has its own
-  page with full specs and a link to the manufacturer, and there is a search box.
+- **A catalog of 172 real parts**: 16 cases, 26 motherboards, 25 processors,
+  28 coolers, 17 memory kits, 17 drives, 27 graphics cards and 16 power
+  supplies, many of them the ones current build guides recommend (see Parts
+  data). Each category is a list with filters, each part has its own page with
+  full specs and a link to the manufacturer, and there is a search box.
 - **"Only what fits my build"** filters a list with the same compatibility rules
   the case uses.
 - **Adding parts:** every row has one button, always in the same place: Add,
   or Remove once the part is in. The row itself opens the part's page. With a
   mouse a part can also be dragged from a list into the case: valid slots show
   a green outline; a part that does not fit shows red with the reason, shakes
-  and backs out.
+  and backs out. A row answers the pointer as one surface, edge to edge, and
+  every button has a hover and a pressed state of the same family.
 - **The build as a numbered list**, in the order a machine is put together,
   with the next step marked and a link to choose it; cables each have a Plug in
   button, and the power button says what is still missing.
@@ -32,11 +34,23 @@ come together.
   clips snap shut, the heatsink over an M.2 socket swings up, the drive goes in
   at an angle and is pressed flat and the heatsink comes back down, cooler fans
   clip on last (and a cooler with a lid gets it after them), a radiator slides
-  in and its hoses run to the pump, the graphics card latches.
+  in and its hoses are run, the graphics card latches.
+- **Hoses that go where hoses go:** a liquid cooler's fans sit edge to edge on
+  the radiator and leave a bare tank at each end. Each hose leaves an elbow on
+  the pump, passes over the memory and comes squarely into a collar on that
+  tank, never through a fan. A test walks every hose in every case that can
+  take each cooler.
 - **Cables:** once both ends are in the case the build panel lists the cable
   (24-pin, CPU power, graphics power, SATA, cooler, front panel). Each is a
   step like any part: it plugs in, then runs along its route. The machine will
-  not power on until the required ones are in.
+  not power on until the required ones are in. Graphics and drive power run
+  from the supply along the chamber under the shroud and come up through it.
+- **Behind the tray:** "Back panel" on the timeline takes the far side panel
+  off and turns the machine round. The cables carry on there: the 24-pin down
+  a run beside the grommets, CPU power along the top and down the same run,
+  SATA with them, the front-panel leads down the front edge, all held by
+  straps and ending in the open end of the power-supply chamber. Plug a cable
+  in with the panel off and it is drawn along that route.
 - **Variety:** ATX, microATX and Mini-ITX boards; single- and twin-tower air
   coolers; 240 and 360 mm liquid coolers mounted top or front; M.2 and 2.5-inch
   drives, several per build; a choice of case.
@@ -199,7 +213,14 @@ The redesigned interface (one button per row, the numbered build list, the
 layouts for small screens) added 2 KB: first load is 157 KB in 4 requests. A
 run at a calmer moment gave first paint 48 ms and a first 3D frame at 129 ms,
 no late frames in 1020 unthrottled and 10 in 1015 with the CPU slowed four
-times. The whole table has not been re-run on a quiet machine since.
+times.
+
+The cable runs behind the tray, the removable panel and 47 more parts took
+the first load to 159 KB in 4 requests. The same scripted build is 1008 draw
+calls, up from 967, because each cable now has a second stretch. One run of
+the interaction checks on this machine, while it was busy, showed no late
+frames in 1023 and none drawn while idle. The whole table has not been re-run
+on a quiet machine since the redesign.
 
 The throttled column slows the CPU and network only; the GPU is still this
 machine's. Nothing has been measured on a phone or a low-end laptop, and only
@@ -218,6 +239,29 @@ than the maker's page says, all corrected, and two places where a maker's
 manual disagrees with its own product page, which the data files note. One
 card is entered 30 mm lower than its maker's printed height on purpose,
 because that figure appears to include the bracket; the data file says so.
+
+Forty-seven parts were then added by a different route: by what people who
+follow PC hardware are told to buy. For each category, current build guides
+and "best of" roundups were read (among them Tom's Hardware, PC Gamer,
+TechSpot, GamersNexus, TechRadar, Tom's Guide, PCGamesN, Club386, Logical
+Increments, TechRepublic, Hardware Busters and KitGuru), the models they name
+were tallied, and the most recommended ones the catalog lacked and can draw
+went in. The guides decided only which parts; no figure, sentence or image
+comes from them, and no other parts database or PC builder was used. Every
+figure is from the maker's own page, and each of the 47 was again read a
+second time, independently. That reading changed three things: a memory
+kit's height (entered from a review of a sibling kit; the maker's own FAQ
+gives 44 mm), a drive's part number (the suffix the maker prints for that
+capacity) and whether one cooler's fan is held by wire clips. Where the two
+readers disagreed about a cooler's fan count and depth, the maker's manual
+and dimension drawing were read a third time and bore out the first.
+
+The same tally shows what is still missing. Widely recommended, and not here
+because the drawing or the rules cannot do them yet: dual-chamber and
+"fish tank" cases (several guides' first pick), small-form-factor cases,
+E-ATX boards, AM4 processors, Founders Edition cards, liquid coolers with a
+screen for a pump cap or a 420 mm radiator, power supplies with their sockets
+on the side, and drives that ship with a heatsink.
 
 Every category but processors and drives also carries a `look` entry, read
 from the same pages' text and photos: what a case's front panel is and how it
