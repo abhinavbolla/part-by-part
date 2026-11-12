@@ -353,9 +353,9 @@ async function interact(browser, profile) {
 
   // Search.
   await page.click('#search');
-  await page.keyboard.type('990');
+  await page.keyboard.type('990 pro');
   await page.waitForSelector('.hit');
-  expect((await page.locator('.hit').count()) === 1, 'search finds the 990 Pro');
+  expect((await page.locator('.hit').first().getAttribute('href')) === '/parts/storage/samsung-990-pro-1tb/', 'search puts the 990 Pro first');
   await page.keyboard.press('Enter');
   await page.waitForSelector('.detail[data-id="samsung-990-pro-1tb"]');
   expect(await page.evaluate(() => location.pathname) === '/parts/storage/samsung-990-pro-1tb/', 'search opens the part page');
