@@ -465,7 +465,7 @@ export function checkAdd(slots: Slots, step: Step): Issue[] {
     return [{
       level: 'block',
       code: 'needs-' + needed,
-      message: `Seat a ${CATEGORY_LABEL[needed].toLowerCase()} first.`,
+      message: `Add a ${CATEGORY_LABEL[needed].toLowerCase()} first.`,
       parts: [step.id],
     }];
   }

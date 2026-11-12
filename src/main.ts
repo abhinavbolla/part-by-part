@@ -30,12 +30,16 @@ const chip = el('chip');
 const notice = el('notice');
 const hud = el('hud');
 const lookButton = el<HTMLButtonElement>('look');
+const tabs = el('tabs');
+const tally = el('tally');
+const sheet = el<HTMLButtonElement>('sheet');
 
-const SAVE_KEY = 'pc-builder:build';
+const SAVE_KEY = 'part-by-part:build';
+const OLD_SAVE_KEY = 'pc-builder:build'; // builds saved under the project's working name
 const boot = JSON.parse(el('boot').textContent ?? '{}') as { case: CasePart };
 const store = new BuildStore(boot.case);
 try {
-  store.restore(JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null'));
+  store.restore(JSON.parse(localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(OLD_SAVE_KEY) ?? 'null'));
 } catch {
   // A build that cannot be read is simply not restored.
 }
@@ -63,21 +67,52 @@ let scene: SceneApi | null = null;
 let powered = false;
 let scrubbing = false;
 
-/** How much of the window the panels cover, so the case is centred in what is left. */
+/**
+ * How much of the window the panels cover, so the machine is centred in what
+ * is left. The stylesheet says how the panels are docked in the arrangement
+ * in force: along the bottom, or as columns at the sides. The timeline always
+ * sits at the bottom of the free area.
+ */
 function insets(): Insets {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const out: Insets = { left: 0, right: 0, top: 0, bottom: 0 };
-  const trayRect = tray.getBoundingClientRect();
-  const statusRect = status.getBoundingClientRect();
-  // On a wide window the panels sit at the sides; on a narrow one they are bands.
-  if (trayRect.width > vw * 0.6) out.bottom = vh - trayRect.top;
-  else out.left = trayRect.right;
-  if (statusRect.width > vw * 0.6) out.top = statusRect.bottom;
-  else out.right = vw - statusRect.left;
-  out.bottom = Math.max(out.bottom, vh - timeline.getBoundingClientRect().top);
+  const along = getComputedStyle(document.documentElement).getPropertyValue('--dock').trim() === 'bottom';
+  for (const element of [tray, status, tabs, timeline]) {
+    const rect = element.getBoundingClientRect();
+    if (!rect.width || !rect.height) continue; // not shown in this arrangement
+    if (along || element === timeline) out.bottom = Math.max(out.bottom, vh - rect.top);
+    else if (rect.left + rect.width / 2 < vw / 2) out.left = Math.max(out.left, rect.right);
+    else out.right = Math.max(out.right, vw - rect.left);
+  }
   return out;
 }
+
+/** True when Parts and Build share one panel and are switched with tabs. */
+const tabbed = (): boolean => getComputedStyle(tabs).display !== 'none';
+
+function showTab(name: 'parts' | 'build'): void {
+  document.body.dataset.tab = name;
+  for (const button of tabs.querySelectorAll<HTMLButtonElement>('[data-tab]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.tab === name));
+  }
+}
+showTab('parts');
+
+/** Tells the scene the free area changed shape. */
+const reframe = (): void => { window.dispatchEvent(new Event('resize')); };
+
+tabs.addEventListener('click', (event) => {
+  const target = event.target as Element;
+  const tab = target.closest<HTMLButtonElement>('[data-tab]')?.dataset.tab;
+  if (tab === 'parts' || tab === 'build') showTab(tab);
+  if (target.closest('#sheet')) {
+    const tall = document.body.classList.toggle('tall');
+    sheet.setAttribute('aria-pressed', String(tall));
+    sheet.setAttribute('aria-label', tall ? 'Make the panel shorter' : 'Make the panel taller');
+    reframe();
+  }
+});
 
 const sceneReady = import('./scene/scene.ts').then((module) => {
   scene = module.createScene(canvas, store, insets);
@@ -265,11 +300,22 @@ function refresh(): void {
     const item = resolve(card.dataset.id!);
     if (!item) continue;
     const why = card.querySelector<HTMLElement>('.why');
-    const rm = card.querySelector<HTMLElement>('.rm');
+    const act = card.querySelector<HTMLButtonElement>('.act');
+    const detail = card.classList.contains('detail');
+    /** Sets the row's one button: what it says, and whether pressing it takes the part out. */
+    const button = (words: string, removes: boolean, disabled = false): void => {
+      if (!act) return;
+      act.textContent = words;
+      act.disabled = disabled;
+      act.setAttribute('aria-label', detail ? words : `${words}: ${item.name}`);
+      if (removes) act.dataset.remove = item.id;
+      else delete act.dataset.remove;
+    };
     if (item.category === 'case') {
       const current = store.pcCase.id === item.id;
       card.classList.toggle('in', current);
-      if (why) why.textContent = current ? 'In use' : store.cursor > 0 ? 'Empty the case to change it.' : '';
+      button(current ? 'In use' : detail ? 'Use this case' : 'Use', false, current);
+      if (why) why.textContent = current ? '' : store.cursor > 0 ? 'Empty the case to change it.' : '';
       continue;
     }
     const installed = store.isInstalled(item.id);
@@ -277,11 +323,18 @@ function refresh(): void {
     const misfit = isMisfit(issues);
     card.classList.toggle('in', installed);
     card.classList.toggle('no', misfit);
+    // Cannot go in yet (something else comes first, or its place is taken): the button stays, quieter
+    card.classList.toggle('wait', !installed && !misfit && issues.length > 0);
+    if (isCable(item)) button(installed ? 'Unplug' : 'Plug in', installed);
+    else button(installed ? (detail ? 'Remove from build' : 'Remove') : detail ? 'Add to build' : 'Add', installed);
     // In a list, "seat a board first" would repeat on every row: say it once above.
     const inList = card.parentElement?.classList.contains('rows') ?? false;
     if (inList && issues.length && !misfit) listHint ??= issues[0].message;
-    if (why) why.textContent = inList && !misfit ? '' : issues[0]?.message ?? '';
-    if (rm) rm.hidden = !installed;
+    if (why) {
+      why.textContent = installed && !isCable(item)
+        ? 'In your build'
+        : inList && !misfit ? '' : issues[0]?.message ?? '';
+    }
   }
   const hint = panel.querySelector<HTMLElement>('.hint');
   if (hint) {
@@ -297,9 +350,14 @@ function refresh(): void {
       : category === 'storage'
         ? slots.storage.map((drive) => drive.name)
         : [slots[category]?.name].filter((name): name is string => !!name);
-    link.querySelector('.cur')!.textContent = chosen.join(', ');
+    link.querySelector('.cur')!.textContent = chosen.length ? chosen.join(', ') : `${link.dataset.n} to choose from`;
     link.classList.toggle('in', chosen.length > 0);
+    link.classList.remove('next');
   }
+  // The first kind with nothing chosen is what to pick next, in the order a machine is built.
+  panel.querySelector<HTMLElement>('.catlink:not(.in)')?.classList.add('next');
+  const done = status.querySelector<HTMLElement>('.tally');
+  tally.textContent = done ? `${done.dataset.done}/${done.dataset.of}` : '';
   applyFilters();
   drawPictures();
 
@@ -353,6 +411,8 @@ function showCallout(text: string | null, bad = false): void {
 // ---- catalog navigation -------------------------------------------------------
 
 const router = startRouter(panel, (path) => {
+  // A link in the build list opens a page in the parts panel: show that panel.
+  if (tabbed()) showTab('parts');
   search.value = '';
   hovered = null;
   scene?.showGhost(null);
@@ -390,12 +450,14 @@ function runSearch(): void {
     .map((hit) => hit.entry);
   const esc = (text: string): string => text.replace(/[&<>"]/g, (ch) => `&#${ch.charCodeAt(0)};`);
   panel.innerHTML = `<div class="page" data-kind="search"><p class="crumbs">${hits.length} ${hits.length === 1 ? 'part' : 'parts'}</p><div class="rows">${
-    hits.map((entry) => `<a class="hit" data-nav href="/parts/${entry.c}/${entry.id}/"><svg class="ico"><use href="#i-${entry.c}"/></svg><span class="txt"><b>${esc(entry.n)}</b><i>${esc(entry.b)} · ${CATEGORY_LABEL[entry.c]}</i><span class="spec">${esc(entry.s)}</span></span></a>`).join('')
-  }</div>${hits.length ? '' : '<p class="none">No parts match.</p>'}</div>`;
+    hits.map((entry) => `<a class="hit" data-nav href="/parts/${entry.c}/${entry.id}/"><svg class="ico"><use href="#i-${entry.c}"/></svg><span class="txt"><b>${esc(entry.n)}</b><i>${esc(entry.b)}, ${CATEGORY_LABEL[entry.c].toLowerCase()}</i><span class="spec">${esc(entry.s)}</span></span></a>`).join('')
+  }</div>${hits.length ? '' : '<p class="none">No part matches. Try a maker, a model or a socket.</p>'}</div>`;
 }
 
 search.addEventListener('focus', () => {
   void searchIndex().then((list) => { entries = list; });
+  // On a phone the keyboard takes half the screen: give the list the room.
+  if (tabbed() && getComputedStyle(sheet).display !== 'none' && !document.body.classList.contains('tall')) sheet.click();
 });
 search.addEventListener('input', () => {
   void searchIndex().then((list) => {
@@ -491,7 +553,8 @@ document.addEventListener('focusin', (event) => {
 });
 
 document.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || !(event.target as Element).closest?.('.pick')) return;
+  const target = event.target as Element;
+  if (event.button !== 0 || !target.closest?.('.card .open') || target.closest('button')) return;
   const hit = cardOf(event.target);
   if (!hit || hit.item.category === 'case' || store.isInstalled(hit.item.id)) return;
   const issues = store.check(hit.item);
@@ -524,7 +587,7 @@ window.addEventListener('pointermove', (event) => {
   const snapped = scene!.dragMove(event.clientX, event.clientY);
   chip.hidden = snapped;
   if (press.blocked) showCallout(press.reason, true);
-  else showCallout(snapped ? 'Release to seat' : 'Goes here', false);
+  else showCallout(snapped ? 'Release to add' : 'Goes here', false);
 });
 
 function endPress(event: PointerEvent, cancelled: boolean): void {
@@ -551,6 +614,13 @@ function endPress(event: PointerEvent, cancelled: boolean): void {
 }
 window.addEventListener('pointerup', (event) => endPress(event, false));
 window.addEventListener('pointercancel', (event) => endPress(event, true));
+
+// A drag that ends over its own row must not also open the part's page.
+document.addEventListener('click', (event) => {
+  if (!suppressClick) return;
+  event.preventDefault();
+  event.stopPropagation();
+}, true);
 
 document.addEventListener('click', (event) => {
   const target = event.target as Element;
@@ -587,7 +657,7 @@ document.addEventListener('click', (event) => {
     applyFilters();
     return;
   }
-  if (suppressClick || !target.closest('.pick')) return;
+  if (suppressClick || !target.closest('.act')) return;
   const hit = cardOf(target);
   if (hit) add(hit.item, hit.card, event.timeStamp);
 });
@@ -659,12 +729,39 @@ function pick(): void {
   canvas.style.cursor = step && !isCable(step) ? 'pointer' : '';
 }
 
+/** Fingers on the drawing. One turns the case; two pinch to zoom. */
+const touches = new Map<number, { x: number; y: number }>();
+let pinch = 0;
+const spread = (): number => {
+  const [a, b] = [...touches.values()];
+  return Math.hypot(a.x - b.x, a.y - b.y);
+};
+
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== 0) return;
+  if (event.pointerType === 'touch') {
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touches.size === 2) {
+      pinch = spread();
+      orbit = null;
+      canvas.classList.remove('orbit');
+      return;
+    }
+  }
   orbit = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: 0 };
   canvas.setPointerCapture(event.pointerId);
 });
 canvas.addEventListener('pointermove', (event) => {
+  if (touches.has(event.pointerId)) {
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touches.size === 2 && pinch > 0) {
+      const now = spread();
+      // The same scale the wheel uses: spreading the fingers by a factor zooms in by it.
+      if (now > 0) scene?.zoomBy(-Math.log(now / pinch) / 0.0012);
+      pinch = now;
+      return;
+    }
+  }
   pointer = { x: event.clientX, y: event.clientY };
   if (orbit && event.pointerId === orbit.id) {
     const dx = event.clientX - orbit.x;
@@ -680,7 +777,8 @@ canvas.addEventListener('pointermove', (event) => {
     orbit.y = event.clientY;
     return;
   }
-  if (!picking) picking = requestAnimationFrame(pick);
+  // Naming the part under the pointer is for a pointer that can hover.
+  if (event.pointerType !== 'touch' && !picking) picking = requestAnimationFrame(pick);
 });
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
@@ -688,6 +786,13 @@ canvas.addEventListener('pointerleave', () => {
   chip.hidden = true;
 });
 const endOrbit = (event: PointerEvent): void => {
+  const pinched = touches.size > 1;
+  touches.delete(event.pointerId);
+  if (touches.size < 2) pinch = 0;
+  if (pinched) {
+    orbit = null;
+    return;
+  }
   const clicked = orbit && orbit.moved <= 4 && event.type === 'pointerup';
   orbit = null;
   canvas.classList.remove('orbit');
