@@ -208,14 +208,15 @@ Chrome has been run.
 
 Specs in `src/catalog/data` were entered by hand from each manufacturer's own
 product page on 11 and 12 November 2026, and every part records the page it
-came from. The 59 parts added on the second day were each read a second time,
+came from. The 66 parts added on the second day were each read a second time,
 independently, against the maker's page before they went in: sizes, clearances,
 connector counts, slot and socket counts, part numbers. That second reading
 found no wrong figure. It found two part numbers that were not the maker's own
 (a shop's code, and one missing its suffix) and two comments that claimed more
-than the maker's page says, all corrected. One card is entered 30 mm lower than
-its maker's printed height on purpose, because that figure appears to include
-the bracket; the data file says so.
+than the maker's page says, all corrected, and two places where a maker's
+manual disagrees with its own product page, which the data files note. One
+card is entered 30 mm lower than its maker's printed height on purpose,
+because that figure appears to include the bracket; the data file says so.
 
 Every category but processors and drives also carries a `look` entry, read
 from the same pages' text and photos: what a case's front panel is and how it

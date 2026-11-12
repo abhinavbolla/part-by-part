@@ -94,8 +94,9 @@ export const COOLERS: CoolerPart[] = [
     // (estimated from Scythe's front photo), drawn at the published 138.
     kind: 'air', height: 154, width: 138, depth: 128,
     sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1851', 'LGA1200'], fanSize: 120, fans: 2, towers: 2,
-    // A 15 mm slim front fan and a 26 mm middle fan (both published, rubber pads included). Scythe prints no stack
-    // depths or offset: the slim front stack (32), deep rear stack (55), the towers' set-back (15) and the cut under
+    // A 15 mm slim front fan and a 26 mm middle fan (both published, rubber pads included). Scythe says the
+    // heatsink is set back but prints no figure for that or for the stacks:
+    // the slim front stack (32), deep rear stack (55), the towers' set-back (15) and the cut under
     // the rear tower's back edge (about 10 tall, 30 deep) are measured on Scythe's side photo against the 128 mm
     // depth. 32 + 30 + 55 + 15 = 132; the real middle fan fills a 26 mm gap, not the drawing's 30.
     look: { pipes: 6, stack: [32, 55], top: 'plate', fins: 'plain', cutaway: [10, 30], back: 15, fanDepths: [15, 26],
@@ -104,6 +105,7 @@ export const COOLERS: CoolerPart[] = [
     source: 'https://www.deepcool.com/products/Cooling/cpuaircoolers/AK500-High-Performance-CPU-Cooler/2022/16040.shtml',
     // 90 mm heatsink + 25 mm fan = 115 against the published 117, which takes in the fan clips.
     kind: 'air', height: 158, width: 127, depth: 117,
+    // The product page's socket list has no LGA1851; the manual linked from it does. The page is followed.
     sockets: ['AM5', 'AM4', 'LGA1700', 'LGA1200'], fanSize: 120, fans: 1, towers: 1,
     // DeepCool's dimension drawing puts the 90 mm stack's middle about 24 mm behind the 40 mm base's middle.
     look: { pipes: 5, stack: [90], top: 'grid', fins: 'sawtooth', cutaway: [0, 0], back: 24, fanFrame: 'square', blades: 9, clips: true } },

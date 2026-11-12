@@ -526,6 +526,7 @@ export const MOTHERBOARDS: MotherboardPart[] = [
     name: 'MAG B760M Mortar WiFi', sku: 'MAG B760M MORTAR WIFI',
     source: 'https://www.msi.com/Motherboard/MAG-B760M-MORTAR-WIFI/Specification',
     rearIo: [['usbA', 'usbA', 'usbA', 'usbA'], ['dp', 'hdmi'], ['usbA', 'usbC'], ['lan', 'usbA', 'usbA'], ['antenna'], ['antenna'], ['audio', 'audio', 'optical'], ['audio', 'audio', 'audio']],
+    // The spec page gives 256 GB as the most memory; the manual says 192 GB. The page is followed.
     socket: 'LGA1700', chipset: 'B760', formFactor: 'mATX', ramType: 'DDR5', ramSlots: 4, maxRamGb: 256,
     m2Slots: [
       { maxLength: 80, interfaces: ['nvme'] },
