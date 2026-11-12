@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Every job only reads the code. Nothing here writes to the repository or uses
+# a secret, and a pull request from a fork runs with the same read-only token.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Types, the unit tests and the production build, from the committed lockfile.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exactly what the lockfile says
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # Drives the built site in Chrome: adds parts by click and by drag, plugs the
+  # cables, powers on, searches, undoes. It needs a GPU: with Chrome's software
+  # renderer the same run takes over six minutes and times out, so it runs on
+  # macOS. The timings it prints mean nothing on a shared runner; only whether
+  # every check passes.
+  interactions:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exactly what the lockfile says
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Interaction checks
+        run: npm run check:ui
+
+  # New advisories appear without any change here, so this reports but does not
+  # block a pull request. Dependabot raises the fix.
+  advisories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exactly what the lockfile says
+        run: npm ci
+
+      - name: Packages are the ones the registry signed
+        run: npm audit signatures
+
+      - name: Known vulnerabilities, high and above
+        run: npm audit --audit-level=high

@@ -10,7 +10,8 @@
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"src/**/*.test.ts\"",
-    "measure": "node scripts/measure.mjs"
+    "measure": "node scripts/measure.mjs",
+    "check:ui": "node scripts/measure.mjs --checks"
   },
   "dependencies": {
     "three": "^0.187.0"
