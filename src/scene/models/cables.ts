@@ -1,8 +1,9 @@
 // Cable runs. From the open side you see a plug at each end and the stretch of
 // cable from it to where it ducks behind the tray or under the shroud. Behind
 // the tray, each cable carries on: down a run beside the grommets, held by the
-// straps, to the open end of the power-supply chamber. That part shows when
-// the far panel is off. A cable is plugged in, then drawn along its route.
+// straps, to the open end of the power-supply chamber, or down to the face of
+// a supply that stands on its side behind the tray. That part shows when the
+// far panel is off. A cable is plugged in, then drawn along its route.
 
 import { Group, type Mesh } from 'three';
 
@@ -100,9 +101,11 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
   const psuEnd = (psu: PsuPart | undefined, index: number, radius: number, under?: P3): P3 | null => {
     if (!psu) return null;
     const [sx, sy, sz] = psuSocket(psu, lay, index);
+    // A supply on its side has its sockets turned with it
+    const plug: P3 = lay.psu.side ? [10, 15, 12] : [10, 12, 15];
     if (under) {
       const turn = Math.max(under[0], sx + 42);
-      run([10, 12, 15], [sx + 5, sy, sz], [18, 0, 0], [
+      run(plug, [sx + 5, sy, sz], [18, 0, 0], [
         [sx + 10, sy, sz],
         [sx + 28, sy + 3, sz],
         [(sx + 28 + turn) / 2 + 6, (sy + under[1]) / 2 - 4, (sz + under[2]) / 2],
@@ -112,8 +115,18 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
       ], radius);
       return null;
     }
-    // Side by side through the tray, in the order of their sockets
     const column = Math.floor(index / 2);
+    if (lay.psu.side) {
+      // The supply is already behind the tray: out of its face, then up into the run
+      const meet: P3 = [sx + 30 + column * 8, sy + 8, zb];
+      run(plug, [sx + 5, sy, sz], [18, 0, 0], [
+        [sx + 10, sy, sz],
+        [sx + 24, sy + 2, (sz + zb) / 2],
+        meet,
+      ], radius);
+      return meet;
+    }
+    // Side by side through the tray, in the order of their sockets
     const through: P3 = [
       Math.min(chamber.x1 - 10, Math.max(chamber.x0 + 10, sx + 34 + column * 11)),
       Math.min(chamber.y1 - 12, sy + 8 + column * 12),
@@ -191,6 +204,31 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
       const mount = cable.target ? ctx.mounts.get(cable.target) : null;
       const bay = lay.bays[mount?.kind === 'bay' ? mount.index : 0] ?? lay.bays[0];
       let power: P3 | undefined;
+      const port = bl.sata;
+      const [x, y] = [X(port.u), Y(port.v)];
+      const grommet = grommetNear(y);
+      if (bay?.face === 'back') {
+        // On the plate behind the tray, connectors down: data from the board's
+        // port through a grommet and along the back, power up the back from the supply
+        const [bx, cy, cz] = [bay.x, bay.y - 36, bay.z - 3];
+        const drop = Math.max(chamber.y1 + 30, cy - 60);
+        run([10, 6, 4], [bx - 14, cy - 4, cz], [0, -14, 0], [
+          [bx - 14, cy - 6, cz], [bx - 12, cy - 16, zb + 3], [bx + 70, cy - 18, zb + 3],
+          [grommet.x - 24, grommet.y - 6, zb + 3], [grommet.x, grommet.y, behind],
+        ], 2, M.cableData);
+        const meet = psuEnd(slots.psu, PSU_SOCKET.sata, 2.6);
+        // Without a supply the power lead hangs down to the top of its space
+        run([19, 6, 4], [bx + 4, cy - 4, cz], [0, -14, 0], [
+          [bx + 4, cy - 6, cz], [bx + 6, cy - 22, zb - 3], [bx + 56, cy - 30, zb - 3], [bx + 64, drop, zb - 3],
+          ...(meet
+            ? [[bx + 64, chamber.y1 + 10, zb - 2], [meet[0] + 6, meet[1] + 18, zb], meet] as P3[]
+            : [[bx + 64, chamber.y1 + 4, zb - 3]] as P3[]),
+        ], 2.6);
+        run([8, 12, 5], [x + 1, y, Z(10.5)], [0, 0, 14], [
+          [x + 1, y, Z(14)], [x + 10, y - 2, Z(22)], [grommet.x, grommet.y, Z(8)], [grommet.x, grommet.y, behind],
+        ], 2, M.cableData);
+        break;
+      }
       if (bay) {
         const edge = bay.z - 36;
         const land = clampCut(bay.x);
@@ -204,9 +242,6 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
         ], 2.6);
         power = [land + 8, underShroud, cutZ];
       }
-      const port = bl.sata;
-      const [x, y] = [X(port.u), Y(port.v)];
-      const grommet = grommetNear(y);
       run([8, 12, 5], [x + 1, y, Z(10.5)], [0, 0, 14], [
         [x + 1, y, Z(14)], [x + 10, y - 2, Z(22)], [grommet.x, grommet.y, Z(8)], [grommet.x, grommet.y, behind],
       ], 2, M.cableData);
@@ -229,6 +264,15 @@ export function buildCable(cable: CablePart, ctx: CableContext): PartModel {
         run([11, 5, 6], plug, [0, 0, 14], points, 1.6);
         // From the ports on the roof: down the front edge behind the tray, into the chamber
         const fx = lay.frontInner - 22 + dx * 0.6;
+        if (lay.ledge) {
+          // Beside a ledge, on under it to meet the lead that came down through its slot
+          hidden([
+            [fx - 30, lay.H - 10, zb], [fx - 6, lay.H - 22, zb], [fx, lay.H - 60, zb],
+            [fx, chamber.y1 + 60, zb], [(fx + land) / 2, chamber.y1 + 4, zb],
+            [land + dx + 10, underShroud - 12, (zb + cutZ) / 2], [land + dx, underShroud, cutZ],
+          ], 1.6);
+          continue;
+        }
         hidden([
           [fx - 30, lay.H - 10, zb], [fx - 6, lay.H - 22, zb], [fx, lay.H - 60, zb],
           [fx, chamber.y1 + 60, zb], [(fx + chamber.x1) / 2, chamber.y1 + 8, zb],

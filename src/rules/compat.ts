@@ -48,7 +48,7 @@ export interface Issue {
 const BASE_LOAD = 60;
 /** Depth of a 25 mm fan, for radiators mounted behind the front panel. */
 const FAN_DEPTH = 25;
-/** 2.5-inch drives are mounted on the shroud, which has room for two. */
+/** 2.5-inch drives are drawn on the shroud, or on a plate behind the tray; either has room for two. */
 const MAX_DRAWN_BAYS = 2;
 
 export function slotsFrom(pcCase: CasePart, steps: Step[], fixed?: Map<string, StorageMount>): Slots {

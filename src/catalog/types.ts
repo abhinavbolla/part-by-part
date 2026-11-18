@@ -66,6 +66,22 @@ export interface CasePart extends Base {
     cableBar: boolean;
     /** A pull tab at the back of the roof. */
     pullTab: boolean;
+    /** Height of the feet or runners under the main chamber's floor; 22 when not given. */
+    feetHeight?: number;
+    /**
+     * A power supply on its side behind the tray, fan toward the far panel, in
+     * place of one lying under a shroud. `behindTray` is the cable space behind
+     * the tray. The tray steps out into the main chamber as a ledge along its
+     * bottom that hides the supply: `ledge.rear` and `ledge.front` are its
+     * heights above the ground at the rear and at the front, `ledge.out` how far
+     * it stands from the tray. `vent` is the length of the perforated band at
+     * the rear of the far panel, which the supply's fan breathes through.
+     */
+    sidePsu?: { behindTray: number; ledge: { rear: number; front: number; out: number }; vent: number };
+    /** Width of a solid strip along the roof's far edge, which carries the ports. */
+    topSolidFar?: number;
+    /** Height of the solid strip across the foot of a front panel that runs down to the floor. */
+    frontFoot?: number;
   };
 }
 

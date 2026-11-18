@@ -523,19 +523,29 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
       return;
     }
     if (change.kind === 'install' && change.step && change.index !== undefined) {
-      // A part goes in from the open side, so the machine turns back to show it.
+      // A part goes in from the open side, so the machine turns back to show it;
+      // one that goes in from the far side turns it round, panel off.
       // A cable can be watched from either side.
-      if (change.step.category !== 'cable') setBack(false);
-      ensure(change.step);
+      const model = ensure(change.step);
+      if (change.step.category !== 'cable') setBack(model.fromBehind === true);
       const start = loose.get(change.step.id)?.p ?? 0;
       loose.delete(change.step.id);
       // A dropped step carries on from where it is held, so whatever was still
       // seating before it finishes at once. A clicked one waits its turn.
       s = start > 0 ? change.index + start : Math.min(s, change.index);
     } else if (change.kind === 'remove' && change.step && change.index !== undefined) {
+      // A part that goes in from the far side comes out that way too
+      if (models.get(change.step.id)?.fromBehind) setBack(true);
       const p = clamp01(s - change.index);
       if (s > change.index) s = Math.max(change.index, s - 1);
       if (p > 0) loose.set(change.step.id, { p, target: 0, drive: true, shake: 0 });
+    } else if (change.kind === 'cursor') {
+      // Undo and redo: a part that goes in from the far side is watched from there
+      const [from, to] = [Math.min(s, store.cursor), Math.max(s, store.cursor)];
+      for (let i = Math.floor(from); i < Math.ceil(to); i++) {
+        const step = store.steps[i];
+        if (step && ensure(step).fromBehind) setBack(true);
+      }
     }
     reconcile();
     invalidate();
@@ -586,6 +596,8 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
     };
     model.group.visible = false;
     showGhost(step, blocked);
+    // Its slot is only in sight from the far side
+    if (model.fromBehind) setBack(true);
   }
 
   /** Moves the held step under the pointer. Returns true while it is snapped to its slot. */
@@ -641,7 +653,7 @@ export function createScene(canvas: HTMLCanvasElement, store: BuildStore, insets
   /** A blocked step comes up to its slot, shakes, and goes away again. */
   function bounce(step: Step): void {
     if (store.steps.some((item) => item.id === step.id)) return;
-    ensure(step);
+    if (ensure(step).fromBehind) setBack(true);
     const from = loose.get(step.id)?.p ?? 0;
     loose.set(step.id, { p: from, target: HOVER, drive: false, shake: SHAKE });
     showGhost(step, true);
