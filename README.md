@@ -49,8 +49,9 @@ come together.
   off and turns the machine round. The cables carry on there: the 24-pin down
   a run beside the grommets, CPU power along the top and down the same run,
   SATA with them, the front-panel leads down the front edge, all held by
-  straps and ending in the open end of the power-supply chamber. Plug a cable
-  in with the panel off and it is drawn along that route.
+  straps and ending in the open end of the power-supply chamber (or, where the
+  supply lies on its side behind the tray, at its face). Plug a cable in with
+  the panel off and it is drawn along that route.
 - **Variety:** ATX, microATX and Mini-ITX boards; single- and twin-tower air
   coolers; 240 and 360 mm liquid coolers mounted top or front; M.2 and 2.5-inch
   drives, several per build; a choice of case.
@@ -287,9 +288,19 @@ catalog does not record (chokes, headers, the memory and 24-pin sockets) are in
 a usual arrangement for the board's size, not that board's own.
 
 Some real parts are left out because the drawing cannot do them justice yet:
-cases whose power supply is not under a shroud at the bottom rear (the NZXT
-H7 Flow of 2024 stands it upright behind the tray), coolers that blow down at
-the board, and cards with fans on both faces. Three were left out because
+coolers that blow down at the board, and cards with fans on both faces.
+
+One case, the NZXT H7 Flow of 2024, has no shroud: its power supply lies on
+its side behind the tray, fan toward the far panel, under a ledge that the
+tray steps out into along its bottom. The drawing has that ledge, the
+perforated floor beside it with its three fan mounts marked, the tall opening
+for the supply at the bottom of the rear panel and the vented band on the far
+panel, and the supply and the 2.5-inch drives go in from the far side with
+that panel off. The ledge's heights and outline, the runners it stands on and
+the width of the roof's solid strip are estimates from the maker's photos,
+and that the far half of the body comes down to the base is from a review.
+The drive cage at the front of its floor and the logo on the front are not
+drawn. Three were left out because
 their makers no longer show what the catalog records: a drive whose product
 page is gone and whose length the maker prints nowhere, a power supply whose
 rear face is in no photo, and a card whose maker's site sits behind a bot
