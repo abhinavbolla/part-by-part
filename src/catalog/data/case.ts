@@ -61,6 +61,44 @@ export const CASES: CasePart[] = [
     },
   },
   {
+    id: 'nzxt-h7-flow-2024', category: 'case', brand: 'NZXT', name: 'H7 Flow', sku: 'CM-H72FB-01',
+    source: 'https://nzxt.com/product/h7-flow',
+    // The height is with feet, as the spec sheet says.
+    dims: { length: 468, width: 244, height: 544 },
+    moboFormFactors: ['E-ATX', 'ATX', 'mATX', 'Mini-ITX'],
+    maxGpuLength: 410, maxCoolerHeight: 185,
+    psuFormFactors: ['ATX'], maxPsuLength: 200, expansionSlots: 7,
+    // Three F120Q fans at the front; no rear or bottom fan ships.
+    includedFans: { front: [120, 120, 120], top: [], rear: [] },
+    // The page prints maxima only (front 360 or 420, top 360 or 280, rear 120
+    // or 140); the smaller sizes are assumed to fit. Three 120 mm fan mounts in
+    // the floor, for fans only, are not recorded.
+    radiators: { front: [120, 140, 240, 280, 360, 420], top: [120, 140, 240, 280, 360], rear: [120, 140] },
+    // Two 2.5in on a plate behind the tray and two either-size mounts in a cage
+    // at the front of the floor; only the plate is drawn.
+    bays: { ssd25: 4, hdd35: 2 },
+    look: {
+      // frontDepth is an estimate by proportion from the side photos.
+      front: 'mesh', slats: 0, holes: 'rounds', frontDepth: 28, frontGap: 0, top: 'mesh', topSolidFront: 0,
+      ioAt: 'far', ports: { usbA: 2, usbC: 1, audio: 1 }, reset: false, powerRound: true, feet: 'bars',
+      // No fan ships at the rear; the mount takes 120 or 140 mm.
+      shroud: 'none', rearFan: 140, rearGrille: 'hex', rearVented: true, cableBar: true, pullTab: false,
+      // Two full-width runners, front and rear, estimated 40 mm tall from the side
+      // photos. That the far half of the body comes down to the base beside them
+      // is from a review (Hardware Busters); the maker's own side views disagree.
+      feetHeight: 40,
+      // The supply lies on its side in the far half, as the manual draws it.
+      // behindTray is the printed cable space. The ledge's heights (185 mm at the
+      // rear, 120 mm at the front) are estimates by proportion from the side
+      // photos; how far it stands out is the supply's 86 mm less that cable space,
+      // with a little clearance. The vent band's length is judged by eye.
+      sidePsu: { behindTray: 34.5, ledge: { rear: 185, front: 120, out: 58 }, vent: 135 },
+      // The strip's width and the front's solid foot are estimates by proportion
+      // from the roof and front photos. The logo on the foot is not drawn.
+      topSolidFar: 65, frontFoot: 70,
+    },
+  },
+  {
     id: 'lian-li-lancool-216', category: 'case', brand: 'Lian Li', name: 'Lancool 216', sku: 'LANCOOL 216RX',
     source: 'https://lian-li.com/product/lancool-216/',
     dims: { length: 480.9, width: 235, height: 491.7 },
