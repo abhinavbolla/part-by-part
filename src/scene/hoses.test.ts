@@ -1,6 +1,7 @@
 // A liquid cooler's hoses run from the pump to the radiator. These checks walk
 // each hose in every case that can take each cooler, and fail if it passes
-// through one of the radiator's fans, the case's own fans, or a wall.
+// through one of the radiator's fans, the case's own fans, a wall, or the ledge
+// over a power supply on its side.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ import { CatmullRomCurve3, Vector3 } from 'three';
 import { CASES, PARTS } from '../catalog/parts.ts';
 import type { LiquidCoolerPart } from '../catalog/types.ts';
 import { radiatorMount } from '../rules/compat.ts';
-import { PANEL, boardLayout, caseLayout } from './layout.ts';
+import { PANEL, boardLayout, caseLayout, ledgeTop } from './layout.ts';
 import { hosePaths, radiatorPlace } from './models/components.ts';
 
 const coolers = PARTS.filter((part): part is LiquidCoolerPart => part.category === 'cooler' && part.kind === 'aio');
@@ -49,6 +50,10 @@ test('no hose passes through a fan or a wall', () => {
           }
           assert.ok(at.z + radius < lay.W / 2 - PANEL, `${where}: a hose comes through the open side`);
           assert.ok(at.y + radius < lay.H - PANEL, `${where}: a hose comes through the roof`);
+          if (lay.ledge) {
+            const over = at.y - radius > ledgeTop(lay.ledge, at.x) || at.z - radius > lay.ledge.z;
+            assert.ok(over, `${where}: a hose goes into the ledge at ${spot.map(Math.round)}`);
+          }
           walked++;
         }
       }

@@ -54,7 +54,7 @@ export function specRows(item: CatalogItem): [string, string][] {
         ['Motherboards', list(item.moboFormFactors)],
         ['Graphics card', `up to ${item.maxGpuLength} mm`],
         ['CPU cooler', `up to ${item.maxCoolerHeight} mm tall`],
-        ['Power supply', `${list(item.psuFormFactors)}, up to ${item.maxPsuLength} mm`],
+        ['Power supply', `${list(item.psuFormFactors)}, up to ${item.maxPsuLength} mm${item.look?.sidePsu ? ', on its side behind the tray' : ''}`],
         ['Expansion slots', String(item.expansionSlots)],
         ['Fans included', list([
           ...item.includedFans.front.map((size) => `front ${size} mm`),

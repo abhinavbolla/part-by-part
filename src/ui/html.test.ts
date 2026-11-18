@@ -49,3 +49,15 @@ test('the empty build panel names the case and keeps power off', () => {
   assert.match(html, /id="power"[^>]* disabled/);
   assert.ok(html.includes('Still needs: motherboard'));
 });
+
+test('a case with its power supply on its side says where it sits', () => {
+  for (const item of CATALOG) {
+    if (item.category !== 'case') continue;
+    const row = specRows(item).find(([name]) => name === 'Power supply');
+    assert.ok(row, item.id);
+    assert.equal(row[1].endsWith('on its side behind the tray'), item.look?.sidePsu !== undefined, item.id);
+  }
+  const h7 = CATALOG.find((item) => item.id === 'nzxt-h7-flow-2024');
+  assert.ok(h7);
+  assert.deepEqual(specRows(h7).find(([name]) => name === 'Power supply'), ['Power supply', 'ATX, up to 200 mm, on its side behind the tray']);
+});

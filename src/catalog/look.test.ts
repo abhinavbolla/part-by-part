@@ -1,12 +1,13 @@
 // The drawing details in the catalog are entered by hand. These checks catch
 // an entry that cannot be drawn: a heatsink off the board, a cover over a
-// socket that is not there, a fan larger than its card.
+// socket that is not there, a fan larger than its card, a power supply that
+// does not fit where the case's drawing puts it.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GPU_ROW, SLOT_PITCH, boardLayout } from '../scene/layout.ts';
-import { PARTS } from './parts.ts';
+import { FRONT_DEPTH, GPU_ROW, PANEL, SLOT_PITCH, boardLayout, psuBody } from '../scene/layout.ts';
+import { CASES, PARTS } from './parts.ts';
 
 test('every board with a recorded arrangement can be drawn', () => {
   for (const board of PARTS) {
@@ -98,6 +99,44 @@ test('every cooler with recorded details can be drawn', () => {
       const across = cooler.look.blockSize;
       assert.ok(across >= 40 && across <= 110, `${cooler.id}: block size`);
       assert.ok(cooler.look.hose >= 8 && cooler.look.hose <= 16, `${cooler.id}: hose`);
+    }
+  }
+});
+
+test('every case with recorded details can be drawn', () => {
+  for (const pcCase of CASES) {
+    const look = pcCase.look;
+    if (!look) continue;
+    const { length: L, width: W, height: H } = pcCase.dims;
+    const feet = look.feetHeight ?? 22;
+    assert.ok(feet >= 5 && feet <= 60, `${pcCase.id}: feet`);
+    assert.ok(look.frontDepth >= FRONT_DEPTH - 5 && look.frontDepth < L / 3, `${pcCase.id}: closed front section`);
+    assert.ok(look.topSolidFront >= 0 && look.topSolidFront < L / 2, `${pcCase.id}: solid strip at the front of the roof`);
+    if (look.topSolidFar !== undefined) {
+      assert.ok(look.topSolidFar > 30 && look.topSolidFar < W / 2, `${pcCase.id}: solid strip along the roof's far edge`);
+      assert.equal(look.ioAt, 'far', `${pcCase.id}: the ports sit on the far strip`);
+    }
+    if (look.frontFoot !== undefined) {
+      assert.ok(look.frontFoot > 0 && look.frontFoot < H / 4, `${pcCase.id}: solid foot of the front`);
+      assert.equal(look.front, 'mesh', `${pcCase.id}: a front that reaches the floor is a perforated panel`);
+    }
+    const ports = 1 + look.ports.usbA + look.ports.usbC + look.ports.audio + (look.reset ? 1 : 0);
+    assert.ok(ports * 19 < (look.ioAt === 'far' ? L : W) - 40, `${pcCase.id}: the button and ports fit in a row`);
+    // A case without a shroud has its power supply on its side behind the tray, and only such a case
+    assert.equal(look.shroud === 'none', look.sidePsu !== undefined, `${pcCase.id}: sidePsu goes with shroud 'none'`);
+    const side = look.sidePsu;
+    if (side) {
+      const { width, height } = psuBody('ATX');
+      assert.deepEqual(pcCase.psuFormFactors, ['ATX'], `${pcCase.id}: the ledge is sized for an ATX body`);
+      assert.ok(side.behindTray > 15 && side.behindTray < W / 4, `${pcCase.id}: cable space behind the tray`);
+      // Deep enough for the body across the case, tall enough for its width standing up, under the ledge's top
+      assert.ok(side.behindTray + side.ledge.out >= height + 4, `${pcCase.id}: ledge stands out far enough for an ATX body`);
+      assert.ok(side.ledge.rear - PANEL - 2 >= width + 12, `${pcCase.id}: ledge is high enough over an ATX body on its side`);
+      assert.ok(side.ledge.front < side.ledge.rear && side.ledge.front > feet + PANEL + 20, `${pcCase.id}: ledge falls toward the front`);
+      assert.ok(side.ledge.out < W / 2, `${pcCase.id}: ledge stands short of the glass`);
+      assert.ok(side.vent > 40 && side.vent < L / 2, `${pcCase.id}: vent band on the far panel`);
+      // The level part of the ledge covers the longest supply and the bend of its cables
+      assert.ok(L * 0.6 - PANEL > pcCase.maxPsuLength + 40, `${pcCase.id}: the level part covers the supply`);
     }
   }
 });

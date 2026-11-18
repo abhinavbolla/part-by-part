@@ -28,4 +28,6 @@ export interface PartModel {
   ghostTargets?: Object3D[];
   /** How to turn the part for its own picture, when its best side faces away in the case. */
   portrait?: [number, number, number];
+  /** Goes in from the far side, with that panel off, so the machine turns round to show it. */
+  fromBehind?: boolean;
 }

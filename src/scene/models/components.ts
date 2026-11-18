@@ -681,27 +681,39 @@ export function buildM2(part: StoragePart, bl: BoardLayout, slot: number, fx: Fi
   };
 }
 
-/** A 2.5-inch drive lying on a mount on top of the shroud. */
+/** A 2.5-inch drive lying on a mount on top of the shroud, or flat on a plate behind the tray. */
 export function buildDrive25(part: StoragePart, lay: CaseLayout, bay: number): PartModel {
   const group = new Group();
+  const spot = lay.bays[Math.min(bay, lay.bays.length - 1)] ?? { x: 0, y: lay.shroudTopY, z: 30, face: 'up' as const };
+  // Behind the tray it is drawn as usual and turned: its top toward the far
+  // panel, its connectors down
+  const back = spot.face === 'back';
+  const unit = back ? new Group() : group;
+  if (back) {
+    unit.rotation.x = -Math.PI / 2;
+    group.add(unit);
+  }
   // Lying flat: length along x, 69.85 mm across, 7 mm thick, corners cut
-  const body = prism(group, chamfered(part.length, 69.85, 3), 7, M.heatsinkDark, 0, 0, 0);
+  const body = prism(unit, chamfered(part.length, 69.85, 3), 7, M.heatsinkDark, 0, 0, 0);
   body.rotation.x = -Math.PI / 2;
-  box(group, part.length - 24, 0.4, 44, M.labelDim, -4, 7.1, 3);
+  box(unit, part.length - 24, 0.4, 44, M.labelDim, -4, 7.1, 3);
   // The SATA data and power connectors on the edge that faces the tray
-  box(group, 8, 3.4, 4, M.slot, -14, 3, -36);
-  box(group, 19, 3.4, 4, M.slot, 4, 3, -36);
-  const screws = [screw(group, -36, 7, 0, 2.2), screw(group, 36, 7, 0, 2.2)];
+  box(unit, 8, 3.4, 4, M.slot, -14, 3, -36);
+  box(unit, 19, 3.4, 4, M.slot, 4, 3, -36);
+  const screws = [screw(unit, -36, 7, 0, 2.2), screw(unit, 36, 7, 0, 2.2)];
   screws.forEach((item) => { item.rotation.x = -Math.PI / 2; });
 
-  const spot = lay.bays[Math.min(bay, lay.bays.length - 1)] ?? { x: 0, y: lay.shroudTopY, z: 30 };
-  const seat: Travel = { seat: [spot.x, spot.y, spot.z], hover: [0, 22, 120], enter: [0, 10, 170] };
+  const seat: Travel = back
+    ? { seat: [spot.x, spot.y, spot.z], hover: [0, 8, -110], enter: [0, 0, -150] }
+    : { seat: [spot.x, spot.y, spot.z], hover: [0, 22, 120], enter: [0, 10, 170] };
   return {
     group,
     frame: 'case',
     duration: 1.8,
     rotors: [],
     glow: [],
+    fromBehind: back,
+    ...(back ? { portrait: [Math.PI / 2, 0, 0] as [number, number, number] } : {}),
     setProgress(p) {
       travel(group, p, seat, 0.4, 0.7, easeInOut);
       screws.forEach((item, i) => {
@@ -1072,36 +1084,46 @@ export function buildGpu(part: GpuPart, bl: BoardLayout, fx: Fixtures): PartMode
   };
 }
 
+/** A point given in the power supply's own frame (length, height, width), in the case frame. */
+function psuPoint(lay: CaseLayout, [x, y, z]: [number, number, number]): [number, number, number] {
+  const { psu } = lay;
+  // On its side its width stands up and its height runs toward the far panel
+  return psu.side ? [psu.x + x, psu.y + z, psu.z - y] : [psu.x + x, psu.y + y, psu.z + z];
+}
+
 /** Where cable `index` plugs into the power supply's front face, in the case frame. */
 export function psuSocket(part: PsuPart, lay: CaseLayout, index: number): [number, number, number] {
   const body = psuBody(part.formFactor);
   const row = index % 2;
   const col = Math.floor(index / 2);
-  return [
-    lay.psu.x + part.length,
-    lay.psu.y + body.height * (0.3 + row * 0.4),
-    lay.psu.z + body.width * (0.16 + col * 0.17),
-  ];
+  return psuPoint(lay, [part.length, body.height * (0.3 + row * 0.4), body.width * (0.16 + col * 0.17)]);
 }
 
 export function buildPsu(part: PsuPart, lay: CaseLayout): PartModel {
   const group = new Group();
+  // On its side, the supply is drawn as usual and turned: width up, fan toward the far panel
+  const side = lay.psu.side;
+  const unit = side ? new Group() : group;
+  if (side) {
+    unit.rotation.x = -Math.PI / 2;
+    group.add(unit);
+  }
   const len = part.length;
   const { width, height } = psuBody(part.formFactor);
-  box(group, len, height, width, M.psu, len / 2, height / 2, width / 2);
+  box(unit, len, height, width, M.psu, len / 2, height / 2, width / 2);
   // The side you see: a label plate and a screw in each corner
-  box(group, len * 0.5, height * 0.3, 0.5, M.labelDim, len * 0.42, height * 0.58, width + 0.1);
-  box(group, len * 0.5, 3, 0.6, M.heatsinkDark, len * 0.42, height * 0.5, width + 0.2);
+  box(unit, len * 0.5, height * 0.3, 0.5, M.labelDim, len * 0.42, height * 0.58, width + 0.1);
+  box(unit, len * 0.5, 3, 0.6, M.heatsinkDark, len * 0.42, height * 0.5, width + 0.2);
   for (const [fx, fy] of [[0.06, 0.1], [0.94, 0.1], [0.06, 0.9], [0.94, 0.9]]) {
-    cyl(group, 2.2, 1, M.screw, 'z', len * fx, height * fy, width + 0.5, true);
+    cyl(unit, 2.2, 1, M.screw, 'z', len * fx, height * fy, width + 0.5, true);
   }
   // The end the cables plug into
   if (part.modular === 'none') {
-    cyl(group, 13, 6, M.cable, 'x', len + 3, height * 0.5, width * 0.5, true);
+    cyl(unit, 13, 6, M.cable, 'x', len + 3, height * 0.5, width * 0.5, true);
   } else {
     for (let row = 0; row < 2; row++) {
       for (let col = 0; col < 5; col++) {
-        box(group, 0.8, height * 0.15, width * 0.11, M.slot,
+        box(unit, 0.8, height * 0.15, width * 0.11, M.slot,
           len + 0.2, height * (0.3 + row * 0.4), width * (0.16 + col * 0.17));
       }
     }
@@ -1110,12 +1132,12 @@ export function buildPsu(part: PsuPart, lay: CaseLayout): PartModel {
   // grille and the four screws that hold it to the panel
   const rear = part.look ?? { switch: true, grille: 'hex' as const, fan: 120 };
   const inletZ = width * 0.8;
-  box(group, 0.8, 22, 30, M.slotAlt, -0.3, height * 0.34, inletZ);
-  box(group, 1, 17, 24, M.slot, -0.5, height * 0.34, inletZ);
-  for (const dz of [-7, 0, 7]) box(group, 1.6, 7, 2, M.steel, -0.4, height * 0.34 + (dz ? -1.5 : 3), inletZ + dz);
+  box(unit, 0.8, 22, 30, M.slotAlt, -0.3, height * 0.34, inletZ);
+  box(unit, 1, 17, 24, M.slot, -0.5, height * 0.34, inletZ);
+  for (const dz of [-7, 0, 7]) box(unit, 1.6, 7, 2, M.steel, -0.4, height * 0.34 + (dz ? -1.5 : 3), inletZ + dz);
   if (rear.switch) {
-    box(group, 0.8, 16, 22, M.slotAlt, -0.3, height * 0.72, inletZ);
-    const rocker = box(group, 2.4, 11, 17, M.black, -0.9, height * 0.72, inletZ);
+    box(unit, 0.8, 16, 22, M.slotAlt, -0.3, height * 0.72, inletZ);
+    const rocker = box(unit, 2.4, 11, 17, M.black, -0.9, height * 0.72, inletZ);
     rocker.rotation.y = 0.12;
   }
   if (rear.grille !== 'none') {
@@ -1124,7 +1146,7 @@ export function buildPsu(part: PsuPart, lay: CaseLayout): PartModel {
       const tri = rear.grille === 'tri';
       const [pz, py] = tri ? [8.4, 7.4] : [9, 7.8];
       const [cols, rowsY] = [Math.floor(spanZ / pz), Math.floor(spanY / py)];
-      copies(group, cols * rowsY, M.vent, (dummy, i) => {
+      copies(unit, cols * rowsY, M.vent, (dummy, i) => {
         const [col, row] = [i % cols, Math.floor(i / cols)];
         dummy.position.set(-0.2, 11 + py * (row + 0.5), width * 0.06 + pz * (col + (tri ? 0.5 : row % 2 ? 0.75 : 0.25)));
         dummy.rotation.set(tri ? ((col + row) % 2 ? Math.PI / 2 : -Math.PI / 2) : 0, 0, Math.PI / 2);
@@ -1132,35 +1154,41 @@ export function buildPsu(part: PsuPart, lay: CaseLayout): PartModel {
       }, tri ? 'tri' : 'hex');
     } else {
       const rowsY = Math.floor(spanY / 7);
-      copies(group, rowsY, M.vent, (dummy, i) => {
+      copies(unit, rowsY, M.vent, (dummy, i) => {
         dummy.position.set(-0.2, 11 + 7 * (i + 0.5), width * 0.06 + spanZ / 2);
         dummy.scale.set(0.5, 3.2, spanZ);
       });
     }
   }
   for (const [fz, fy] of [[0.05, 0.08], [0.95, 0.08], [0.05, 0.92], [0.95, 0.92]]) {
-    cyl(group, 2.6, 1.4, M.screw, 'x', -0.6, height * fy, width * fz, true);
+    cyl(unit, 2.6, 1.4, M.screw, 'x', -0.6, height * fy, width * fz, true);
   }
 
   // The fan grille on top: rings, spokes and a hub
   const grille = Math.min(rear.fan / 2 + 2, Math.min(len, width) / 2 - 4);
   for (const radius of [1, 0.74, 0.48]) {
-    const loop = ring(group, grille * radius, grille * radius - 2.2, 1, M.heatsinkDark, len / 2, height + 1, width / 2);
+    const loop = ring(unit, grille * radius, grille * radius - 2.2, 1, M.heatsinkDark, len / 2, height + 1, width / 2);
     loop.rotation.x = -Math.PI / 2;
   }
   for (let i = 0; i < 4; i++) {
-    const spoke = box(group, grille * 2, 0.8, 2, M.heatsinkDark, len / 2, height + 0.5, width / 2);
+    const spoke = box(unit, grille * 2, 0.8, 2, M.heatsinkDark, len / 2, height + 0.5, width / 2);
     spoke.rotation.y = (i * Math.PI) / 4;
   }
-  cyl(group, grille * 0.26, 1.2, M.fanFrame, 'y', len / 2, height + 0.7, width / 2);
+  cyl(unit, grille * 0.26, 1.2, M.fanFrame, 'y', len / 2, height + 0.7, width / 2);
 
-  const seat: Travel = { seat: [lay.psu.x, lay.psu.y, lay.psu.z], hover: [0, 0, 150], enter: [0, 0, 190] };
+  // From the open side, or on its side from the far side, with that panel off
+  const seat: Travel = side
+    ? { seat: [lay.psu.x, lay.psu.y, lay.psu.z], hover: [0, 0, -150], enter: [0, 0, -190] }
+    : { seat: [lay.psu.x, lay.psu.y, lay.psu.z], hover: [0, 0, 150], enter: [0, 0, 190] };
   return {
     group,
     frame: 'case',
     duration: 1.9,
     rotors: [],
     glow: [],
+    fromBehind: side,
+    // Its own picture shows it lying flat, as in any other case
+    ...(side ? { portrait: [Math.PI / 2, 0, 0] as [number, number, number] } : {}),
     setProgress(p) {
       travel(group, p, seat, 0.4, 0.9, easeInOut);
     },

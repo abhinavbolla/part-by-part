@@ -219,6 +219,27 @@ export function psuBody(formFactor: string): { width: number; height: number } {
   return { width: 150, height: 86 };
 }
 
+/**
+ * The ledge along the bottom of the tray, over a power supply on its side
+ * behind it. Its top is level at the rear and falls in a curve to the front.
+ */
+export interface Ledge {
+  /** Height of its top over the rear, and near the front. */
+  rearY: number;
+  frontY: number;
+  /** Where the top starts to fall, and where it reaches the front height. */
+  slopeX0: number;
+  slopeX1: number;
+  /** Its face toward the glass. */
+  z: number;
+}
+
+/** Height of the ledge's top at x. */
+export function ledgeTop(ledge: Ledge, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - ledge.slopeX0) / (ledge.slopeX1 - ledge.slopeX0)));
+  return ledge.frontY + ((ledge.rearY - ledge.frontY) * (1 + Math.cos(Math.PI * t))) / 2;
+}
+
 export interface CaseLayout {
   L: number;
   W: number;
@@ -230,25 +251,37 @@ export interface CaseLayout {
   /** Inner face of the front panel assembly. */
   frontInner: number;
   floorY: number;
+  /** Top of whatever is under the board: the shroud, or the ledge over the rear. */
   shroudTopY: number;
   /** Viewer-facing surface of the motherboard tray. */
   trayZ: number;
   /** Board frame origin in the case frame. */
   board: { x: number; y: number; z: number };
-  /** PSU bay: rear-bottom corner nearest the tray. */
-  psu: { x: number; y: number; z: number };
+  /**
+   * PSU bay: rear-bottom corner nearest the tray. `side`: the supply stands on
+   * its side behind the tray, its width upright and its fan toward the far panel.
+   */
+  psu: { x: number; y: number; z: number; side: boolean };
+  /** The opening in the rear panel the supply's inlet face shows through, in z and y. */
+  psuHole: { z0: number; z1: number; y0: number; y1: number };
   /** Cable pass-throughs in the tray, right of the board. */
   grommets: { x: number; y: number }[];
   /** Cut-out above the board for the CPU power cable. */
   topCut: { x0: number; x1: number; y: number };
-  /** Slot in the shroud top, where cables come up from below. */
+  /** Slot in the shroud top (or the ledge top), where cables come up from below. */
   shroudCut: { x0: number; x1: number; z: number };
-  /** 2.5-inch drive mounts on top of the shroud. */
-  bays: { x: number; y: number; z: number }[];
+  /** 2.5-inch drive mounts: on top of the shroud, facing up, or on a plate behind the tray, facing the far panel. */
+  bays: { x: number; y: number; z: number; face: 'up' | 'back' }[];
   /** How far the intake fans the case ships with stand in from the front's inner face; 0 without any. */
   frontFans: number;
-  /** The opening in the tray under the shroud, where the power supply's cables pass to the back. */
+  /**
+   * Where the power supply's cables pass to the back: an opening in the tray
+   * under the shroud. Beside a ledge there is no tray there; this is then the
+   * top of the space the supply stands in, and nothing is drawn for it.
+   */
   chamber: { x0: number; x1: number; y0: number; y1: number };
+  /** The ledge over a power supply on its side; null where a shroud covers it. */
+  ledge: Ledge | null;
 }
 
 export const PANEL = 3;
@@ -257,29 +290,60 @@ export const STANDOFF = 6.5;
 
 export function caseLayout(pcCase: CasePart): CaseLayout {
   const { length: L, width: W, height: H } = pcCase.dims;
+  const side = pcCase.look?.sidePsu;
   const rearX = -L / 2;
   const frontX = L / 2;
-  const trayZ = -W / 2 + 26;
+  const trayZ = side ? -W / 2 + PANEL + side.behindTray : -W / 2 + 26;
   const rearInner = rearX + PANEL;
   const frontInner = frontX - FRONT_DEPTH;
 
-  // Feet, shroud, board, then whatever is left above the board.
-  let floorY = 22;
+  let floorY = pcCase.look?.feetHeight ?? 22;
   const boardH = ATX.h;
-  // Never lower than a power supply is tall, with a little air over it
-  const shroudH = Math.max(94, Math.min(110, H - floorY - PANEL - 6 - boardH - 30));
-  const spare = H - PANEL - (floorY + shroudH + 6 + boardH);
-  if (spare < 12) floorY = Math.max(8, floorY - (12 - spare));
-  const shroudTopY = floorY + shroudH;
+  let shroudTopY: number;
+  if (side) {
+    // The board stands just above the ledge's level top
+    shroudTopY = side.ledge.rear;
+  } else {
+    // Feet, shroud, board, then whatever is left above the board.
+    // Never lower than a power supply is tall, with a little air over it
+    const shroudH = Math.max(94, Math.min(110, H - floorY - PANEL - 6 - boardH - 30));
+    const spare = H - PANEL - (floorY + shroudH + 6 + boardH);
+    if (spare < 12) floorY = Math.max(8, floorY - (12 - spare));
+    shroudTopY = floorY + shroudH;
+  }
   const boardY = shroudTopY + 6 + boardH;
   const boardX = rearInner + 10;
 
   const bayCount = Math.min(2, pcCase.bays.ssd25 + pcCase.bays.hdd35);
-  const bays = Array.from({ length: bayCount }, (_, i) => ({
-    x: frontInner - 150 - i * 112,
-    y: shroudTopY,
-    z: 30,
-  }));
+  const bays = Array.from({ length: bayCount }, (_, i) => (side
+    // On a plate behind the tray at the upper rear, one above the other
+    ? { x: boardX + 82, y: boardY - 110 - i * 100, z: trayZ - 3.1, face: 'back' as const }
+    : { x: frontInner - 150 - i * 112, y: shroudTopY, z: 30, face: 'up' as const }));
+
+  const body = psuBody('ATX');
+  // On its side: on the far half's own floor, which reaches the base, its fan
+  // 2 mm off the far panel
+  const psu = side
+    ? { x: rearInner + 1, y: PANEL, z: -W / 2 + PANEL + 2 + body.height, side: true }
+    : { x: rearInner + 1, y: floorY + PANEL, z: trayZ + 8, side: false };
+  const psuHole = side
+    ? { z0: psu.z - body.height + 6, z1: psu.z - 6, y0: psu.y + 7, y1: psu.y + 143 }
+    : { z0: psu.z + 7, z1: psu.z + 143, y0: psu.y + 6, y1: psu.y + 80 };
+  const ledge: Ledge | null = side
+    ? {
+      rearY: side.ledge.rear,
+      frontY: side.ledge.front,
+      // Level over the rear 60 % of the depth, then a curve down over the next
+      // quarter: proportions read from the maker's side photos
+      slopeX0: rearX + L * 0.6,
+      slopeX1: rearX + L * 0.85,
+      z: trayZ + side.ledge.out,
+    }
+    : null;
+  // Beside a ledge, the slot starts in front of the longest supply's cable face
+  const shroudCut = ledge
+    ? { x0: psu.x + pcCase.maxPsuLength + 16, x1: ledge.slopeX0 - 8, z: trayZ + 16 }
+    : { x0: boardX + 120, x1: frontInner - 80, z: trayZ + 16 };
 
   return {
     L, W, H, rearX, frontX, rearInner, frontInner,
@@ -287,17 +351,21 @@ export function caseLayout(pcCase: CasePart): CaseLayout {
     shroudTopY,
     trayZ,
     board: { x: boardX, y: boardY, z: trayZ + STANDOFF + ATX.thickness },
-    psu: { x: rearInner + 1, y: floorY + PANEL, z: trayZ + 8 },
+    psu,
+    psuHole,
     grommets: [-70, -160, -250].map((dy) => ({ x: boardX + ATX.w + 22, y: boardY + dy })),
     topCut: { x0: boardX + 36, x1: boardX + 150, y: boardY + 15 },
-    shroudCut: { x0: boardX + 120, x1: frontInner - 80, z: trayZ + 16 },
+    shroudCut,
     bays,
     frontFans: pcCase.includedFans.front.length ? 26 : 0,
-    chamber: {
-      x0: rearInner + 150,
-      x1: Math.min(frontInner - 60, rearInner + 330),
-      y0: floorY + PANEL + 8,
-      y1: shroudTopY - 8,
-    },
+    chamber: ledge
+      ? { x0: shroudCut.x0, x1: shroudCut.x1, y0: psu.y + 8, y1: ledge.rearY - 8 }
+      : {
+        x0: rearInner + 150,
+        x1: Math.min(frontInner - 60, rearInner + 330),
+        y0: floorY + PANEL + 8,
+        y1: shroudTopY - 8,
+      },
+    ledge,
   };
 }
